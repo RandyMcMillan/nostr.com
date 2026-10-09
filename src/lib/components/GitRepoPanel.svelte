@@ -39,11 +39,13 @@
   let issueOpen = false;
   let issueSubject = '';
   let issueBody = '';
+  let issueLabels = '';
   let issuePublishing = false;
   let issueError = '';
   let prOpen = false;
   let prSubject = '';
   let prBody = '';
+  let prLabels = '';
   let prPublishing = false;
   let prError = '';
   let prRemotes: GitRemote[] = [];
@@ -177,6 +179,7 @@
   function openIssue() {
     issueSubject = '';
     issueBody = '';
+    issueLabels = '';
     issueError = '';
     issueOpen = true;
   }
@@ -189,12 +192,14 @@
       await publishGitIssue({
         repoAddress: address,
         subject: issueSubject.trim(),
-        content: issueBody.trim()
+        content: issueBody.trim(),
+        labels: issueLabels.split(',').map((l) => l.trim()).filter(Boolean)
       });
       issuePublishing = false;
       issueOpen = false;
       issueSubject = '';
       issueBody = '';
+      issueLabels = '';
     } catch (err) {
       issuePublishing = false;
       issueError = err instanceof Error ? err.message : 'Could not publish issue.';
@@ -204,6 +209,7 @@
   async function openPr() {
     prSubject = '';
     prBody = '';
+    prLabels = '';
     prError = '';
     prRemotes = entry?.localPath ? await getRepoRemotes(entry.localPath) : [];
     prOpen = true;
@@ -226,12 +232,14 @@
         content: prBody.trim(),
         tipCommit: tip,
         cloneUrls: prRemotes.map((remote) => remote.url),
-        branchName: branch
+        branchName: branch,
+        labels: prLabels.split(',').map((l) => l.trim()).filter(Boolean)
       });
       prPublishing = false;
       prOpen = false;
       prSubject = '';
       prBody = '';
+      prLabels = '';
       prRemotes = [];
     } catch (err) {
       prPublishing = false;
@@ -358,6 +366,10 @@
             Body
             <textarea bind:value={issueBody} placeholder="Describe the issue" rows="5"></textarea>
           </label>
+          <label>
+            Labels
+            <input type="text" bind:value={issueLabels} placeholder="bug, enhancement" />
+          </label>
           {#if issueError}<p class="error">{issueError}</p>{/if}
           <div class="dialog-actions">
             <button disabled={issuePublishing} on:click={() => (issueOpen = false)}>Cancel</button>
@@ -385,6 +397,10 @@
           <label>
             Body
             <textarea bind:value={prBody} placeholder="Describe the changes" rows="5"></textarea>
+          </label>
+          <label>
+            Labels
+            <input type="text" bind:value={prLabels} placeholder="feature, wip" />
           </label>
           {#if prRemotes.length}
             <p class="git-description">Clone URLs: {prRemotes.map((r) => r.url).join(', ')}</p>
