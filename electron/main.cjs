@@ -16,6 +16,9 @@ const {
   checkoutBranch,
   commit,
   pushRepository,
+  getDiff,
+  stageFile,
+  unstageFile,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -454,6 +457,42 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Push failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:diff', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const diff = await getDiff(localPath, {
+        filePath: payload?.filePath,
+        staged: payload?.staged
+      });
+      return { ok: true, diff };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not read diff.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:stage', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await stageFile(localPath, payload?.filePath);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Stage failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:unstage', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await unstageFile(localPath, payload?.filePath);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Unstage failed.' };
     }
   });
 

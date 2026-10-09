@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { FolderOpen, GitBranch, Trash2, RefreshCw, Loader2, PencilLine, Send } from '@lucide/svelte';
+  import { FolderOpen, GitBranch, Trash2, RefreshCw, Loader2, PencilLine, Send, ChevronDown, ChevronRight, FileText } from '@lucide/svelte';
   import { appPath } from '$lib/paths';
   import { publishGitRepo, type GitRepoAnnouncement } from '$lib/stores/app';
   import {
@@ -15,8 +15,12 @@
     checkoutRepoBranch,
     commitRepo,
     pushRepo,
+    getRepoDiff,
+    stageRepoFile,
+    unstageRepoFile,
     type GitRepoEntry,
-    type GitStatus
+    type GitStatus,
+    type GitStatusFile
   } from '$lib/nativeGit';
 
   let repos: GitRepoEntry[] = [];
@@ -40,6 +44,9 @@
   let selectedCommitRepo: GitRepoEntry | null = null;
   let committing = false;
   let commitError = '';
+  let expandedRepos = new Set<string>();
+  let selectedFile: Record<string, string> = {};
+  let fileDiffs = new Map<string, string>();
 
   onMount(() => {
     void loadRepos();
@@ -172,7 +179,7 @@
     if (!selectedCommitRepo || !commitMessage.trim()) return;
     committing = true;
     commitError = '';
-    const result = await commitRepo(selectedCommitRepo.localPath, commitMessage.trim());
+    const result = await commitRepo(selectedCommitRepo.localPath, commitMessage.trim(), { all: true });
     committing = false;
     if (result.ok) {
       commitOpen = false;
@@ -205,6 +212,60 @@
   function repoName(repo: GitRepoEntry): string {
     const identifier = repo.address.split(':').slice(2).join(':') || 'repo';
     return identifier;
+  }
+
+  function statusLetterLabel(index: string, workingTree: string): string {
+    if (index === 'A' || workingTree === 'A') return 'added';
+    if (index === 'D' || workingTree === 'D') return 'deleted';
+    if (index === 'R') return 'renamed';
+    if (index === 'C') return 'copied';
+    if (index === '?' || workingTree === '?') return 'untracked';
+    if (index === 'M' || workingTree === 'M') return 'modified';
+    return 'changed';
+  }
+
+  function isFileStaged(file: GitStatusFile): boolean {
+    return file.index !== ' ' && file.index !== '?';
+  }
+
+  function toggleRepoFiles(repo: GitRepoEntry) {
+    if (expandedRepos.has(repo.address)) {
+      expandedRepos.delete(repo.address);
+    } else {
+      expandedRepos.add(repo.address);
+    }
+    expandedRepos = expandedRepos;
+  }
+
+  async function selectFile(repo: GitRepoEntry, file: GitStatusFile) {
+    const key = `${repo.address}:${file.path}`;
+    if (selectedFile[repo.address] === file.path) {
+      selectedFile[repo.address] = '';
+      selectedFile = selectedFile;
+      return;
+    }
+    selectedFile[repo.address] = file.path;
+    selectedFile = selectedFile;
+    if (file.index === '?' && file.workingTree === '?') {
+      fileDiffs.set(key, '(new file — no diff for untracked files)');
+      fileDiffs = fileDiffs;
+      return;
+    }
+    const diff = await getRepoDiff(repo.localPath, file.path, isFileStaged(file));
+    fileDiffs.set(key, diff || '(no diff)');
+    fileDiffs = fileDiffs;
+  }
+
+  async function toggleStage(repo: GitRepoEntry, file: GitStatusFile) {
+    error = '';
+    const result = isFileStaged(file)
+      ? await unstageRepoFile(repo.localPath, file.path)
+      : await stageRepoFile(repo.localPath, file.path);
+    if (!result.ok) {
+      error = result.error || 'Stage/unstage failed.';
+    } else {
+      await loadRepos();
+    }
   }
 
   function statusLabel(repo: GitRepoEntry): string {
@@ -257,6 +318,9 @@
               <span class="repo-status"><GitBranch size={13} /> {statusLabel(repo)}</span>
             </div>
             <div class="repo-actions">
+              <button class="icon-button" title="Files" on:click={() => toggleRepoFiles(repo)}>
+                {#if expandedRepos.has(repo.address)}<ChevronDown size={16} />{:else}<ChevronRight size={16} />{/if}
+              </button>
               <button class="icon-button" title="Fetch" on:click={() => fetch(repo)}><RefreshCw size={16} /></button>
               <button class="icon-button" title="Pull" on:click={() => pull(repo)}><GitBranch size={16} /></button>
               <button class="icon-button" title="Push" on:click={() => push(repo)}><Send size={16} /></button>
@@ -274,6 +338,26 @@
               </select>
               <button disabled={!selectedBranch[repo.address]} on:click={() => checkout(repo)}>Checkout</button>
             </div>
+            {#if expandedRepos.has(repo.address)}
+              <div class="repo-file-list">
+                {#each statuses.get(repo.address)?.files ?? [] as file (file.path)}
+                  <div class="repo-file-row" class:selected={selectedFile[repo.address] === file.path}>
+                    <button class="file-stage" title={isFileStaged(file) ? 'Unstage' : 'Stage'} on:click={() => toggleStage(repo, file)}>
+                      {isFileStaged(file) ? '−' : '+'}
+                    </button>
+                    <button class="file-name" on:click={() => selectFile(repo, file)}>
+                      <FileText size={13} /> {file.path}
+                      <span class="file-status">{statusLetterLabel(file.index, file.workingTree)}</span>
+                    </button>
+                  </div>
+                  {#if selectedFile[repo.address] === file.path}
+                    <pre class="file-diff">{fileDiffs.get(`${repo.address}:${file.path}`) ?? ''}</pre>
+                  {/if}
+                {:else}
+                  <div class="repo-file-row empty">No changes</div>
+                {/each}
+              </div>
+            {/if}
           </div>
         {/each}
       </div>

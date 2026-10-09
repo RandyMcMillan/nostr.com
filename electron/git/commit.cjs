@@ -4,6 +4,7 @@ const { runGit } = require('./core.cjs');
 async function commit(repoPath, message, options = {}) {
   const args = ['commit', '-m', message];
   if (options.allowEmpty) args.push('--allow-empty');
+  if (options.all) args.push('-a');
   args.push('--');
   await runGit(args, repoPath, {
     env: {

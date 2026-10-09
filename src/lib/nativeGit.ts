@@ -46,6 +46,9 @@ interface NostrGitBridge {
   checkout: (payload: { localPath: string; branchName: string; create?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   commit: (payload: { localPath: string; message: string; allowEmpty?: boolean; authorName?: string; authorEmail?: string }) => Promise<{ ok: boolean; error?: string }>;
   push: (payload: { localPath: string; remote?: string; branch?: string; forceWithLease?: boolean }) => Promise<{ ok: boolean; error?: string }>;
+  diff: (payload: { localPath: string; filePath?: string; staged?: boolean }) => Promise<{ ok: boolean; error?: string; diff?: string }>;
+  stage: (payload: { localPath: string; filePath?: string }) => Promise<{ ok: boolean; error?: string }>;
+  unstage: (payload: { localPath: string; filePath?: string }) => Promise<{ ok: boolean; error?: string }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -117,12 +120,29 @@ export async function checkoutRepoBranch(localPath: string, branchName: string, 
   return (await bridge()?.checkout({ localPath, branchName, create })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
-export async function commitRepo(localPath: string, message: string, options: { allowEmpty?: boolean; authorName?: string; authorEmail?: string } = {}): Promise<{ ok: boolean; error?: string }> {
+export async function commitRepo(
+  localPath: string,
+  message: string,
+  options: { allowEmpty?: boolean; authorName?: string; authorEmail?: string; all?: boolean } = {}
+): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.commit({ localPath, message, ...options })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export async function pushRepo(localPath: string, remote?: string, branch?: string, forceWithLease = false): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.push({ localPath, remote, branch, forceWithLease })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function getRepoDiff(localPath: string, filePath?: string, staged = false): Promise<string> {
+  const result = await bridge()?.diff({ localPath, filePath, staged });
+  return result?.ok && typeof result.diff === 'string' ? result.diff : '';
+}
+
+export async function stageRepoFile(localPath: string, filePath?: string): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.stage({ localPath, filePath })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function unstageRepoFile(localPath: string, filePath?: string): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.unstage({ localPath, filePath })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export async function cloneRepo(payload: {
