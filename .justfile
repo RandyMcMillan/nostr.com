@@ -1,61 +1,153 @@
-# Nostr Social — common development commands
+default:
+  just --choose
 
-# Default recipe: type-check and test
-@default:
-    just check-test
+help:
+  @make help
 
-# Run the Svelte dev server
-@dev:
-    npm run dev
+rm_cargo_lock:
+  @make rm_cargo_lock
 
-# Generate icons for web, Electron and Capacitor
-@icons:
-    npm run icons
+all:
+  @make all
 
-# Build the production site
-@build:
-    npm run build
+bin:
+  @make bin
 
-# Preview the production build
-@preview:
-    npm run preview
+cargo-help:
+  @make cargo-help
 
-# Type-check the Svelte/TypeScript code
-@check:
-    npm run check
+cargo-release-all:
+  @make cargo-release-all
 
-# Run the test suite
-@test:
-    npm test
+cargo-clean-release:
+  @make cargo-clean-release
 
-# Run type checks and tests (same as CI)
-@check-test:
-    npm run check && npm test
+cargo-publish-all:
+  @make cargo-publish-all
 
-# Build desktop apps
-@desktop-mac:
-    npm run desktop:mac
+cargo-install-bins:
+  @make cargo-install-bins
 
-@desktop-mac-x64:
-    npm run desktop:mac:x64
+cargo-build:
+  @make cargo-build
 
-@desktop-mac-arm64:
-    npm run desktop:mac:arm64
+cargo-install:
+  @make cargo-install
 
-@desktop-linux:
-    npm run desktop:linux
+cargo-sort:
+  @make cargo-sort
 
-@desktop-win:
-    npm run desktop:win
+cargo-build-release:
+  @make cargo-build-release
 
-# Run the CI workflow locally with act
-@act-ci:
-    act -W .github/workflows/ci.yml
+cargo-check:
+  @make cargo-check
 
-# Run the CI workflow locally on Apple Silicon (force amd64 container)
-@act-ci-amd64:
-    act -W .github/workflows/ci.yml --container-architecture linux/amd64
+cargo-bench:
+  @make cargo-bench
 
-# Clean install dependencies
-@ci:
-    npm ci
+cargo-test:
+  @make cargo-test
+
+cargo-test--ignored:
+  @make cargo-test--ignored
+
+cargo-test-workspace:
+  @make cargo-test-workspace
+
+test:
+  @make test
+
+cargo-test-nightly:
+  @make cargo-test-nightly
+
+cargo-test-nightly-workspace:
+  @make cargo-test-nightly-workspace
+
+cargo-test-types-nip_three_four:
+  @make cargo-test-types-nip_three_four
+
+cargo-clippy-workspace:
+  @make cargo-clippy-workspace
+
+cargo-clippy-fix-workspace:
+  @make cargo-clippy-fix-workspace
+
+clippy:
+  @make clippy
+
+cargo-report:
+  @make cargo-report
+
+cargo-run:
+  @make cargo-run
+
+cargo-git-cliff-changelog:
+  @make cargo-git-cliff-changelog
+
+dep-graph:
+  @make dep-graph
+
+gnostr-chat:
+  @make gnostr-chat
+
+fetch-by-id:
+  @make fetch-by-id
+
+fetch-by-kind-and-author:
+  @make fetch-by-kind-and-author
+
+gnostr-note-debug:
+  @make gnostr-note-debug
+
+gnostr-note-trace:
+  @make gnostr-note-trace
+
+post_event:
+  @make post_event
+
+post_from_files:
+  @make post_from_files
+
+broadcast_event_list:
+  @make broadcast_event_list
+
+nip_thirty_four_requests:
+  @make nip_thirty_four_requests
+
+plan-dist-manifest:
+  @make plan-dist-manifest
+
+docker:
+  @make docker
+
+docker-tui:
+  @make docker-tui
+
+docker-chat:
+  @make docker-chat
+
+docker-shared:
+  @make docker-shared
+
+gh-act-run-all:
+  @make gh-act-run-all
+
+gnostr-test-matrix:
+  @make gnostr-test-matrix
+
+gnostr-test-macos:
+  @make gnostr-test-macos
+
+gnostr-test-macos-intel:
+  @make gnostr-test-macos-intel
+
+act-cargo-cross-setup:
+  @make act-cargo-cross-setup
+
+act-cargo-cross:
+  @make act-cargo-cross
+
+act-gnostr-act:
+  @make act-gnostr-act
+
