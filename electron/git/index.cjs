@@ -13,6 +13,7 @@ const { commit } = require('./commit.cjs');
 const { pushRepository } = require('./push.cjs');
 const { getDiff, stageFile, unstageFile } = require('./diff.cjs');
 const { getRefs } = require('./refs.cjs');
+const { getMergeBase, formatPatch } = require('./patch.cjs');
 const store = require('./store.cjs');
 
 module.exports = {
@@ -35,5 +36,7 @@ module.exports = {
   stageFile,
   unstageFile,
   getRefs,
+  getMergeBase,
+  formatPatch,
   store
 };

@@ -1633,6 +1633,14 @@ export interface GitPullRequestInput {
   labels?: string[];
 }
 
+export interface GitPatchInput {
+  repoAddress: string;
+  patch: string;
+  tipCommit: string;
+  parentCommit: string;
+  earliestUniqueCommit?: string;
+}
+
 export async function publishGitRepoState(state: GitRepoState) {
   const currentSession = get(session);
   if (!currentSession) throw new Error('Sign in before publishing.');
@@ -1716,6 +1724,33 @@ export async function publishGitPullRequest(input: GitPullRequestInput) {
   }
 
   const event = await signEvent(currentSession, GIT_PR_KIND, input.content, tags);
+  events.update((existing) => mergeEvents([event], existing));
+  void cacheEvents([event]);
+  enqueuePublish(event);
+  return event;
+}
+
+export async function publishGitPatch(input: GitPatchInput) {
+  const currentSession = get(session);
+  if (!currentSession) throw new Error('Sign in before publishing.');
+
+  const parts = input.repoAddress.split(':');
+  if (parts.length < 3) throw new Error('Invalid repository address.');
+  const [kind, pubkey, ...identifierParts] = parts;
+  if (Number(kind) !== 30617) throw new Error('Not a repository announcement address.');
+  const identifier = identifierParts.join(':');
+
+  const { GIT_PATCH_KIND } = await import('$lib/nostr/kinds');
+  const tags: string[][] = [
+    ['a', `30617:${pubkey}:${identifier}`],
+    ['p', pubkey],
+    ['t', 'root'],
+    ['commit', input.tipCommit],
+    ['parent-commit', input.parentCommit]
+  ];
+  if (input.earliestUniqueCommit) tags.push(['r', input.earliestUniqueCommit]);
+
+  const event = await signEvent(currentSession, GIT_PATCH_KIND, input.patch, tags);
   events.update((existing) => mergeEvents([event], existing));
   void cacheEvents([event]);
   enqueuePublish(event);

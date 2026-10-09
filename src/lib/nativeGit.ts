@@ -54,6 +54,8 @@ interface NostrGitBridge {
     error?: string;
     refs?: { headBranch: string | null; branches: { name: string; commit: string }[]; tags: { name: string; commit: string }[] };
   }>;
+  mergeBase: (payload: { localPath: string; refA: string; refB: string }) => Promise<{ ok: boolean; error?: string; commit?: string }>;
+  formatPatch: (payload: { localPath: string; baseRef?: string; single?: string }) => Promise<{ ok: boolean; error?: string; patch?: string }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -159,6 +161,16 @@ export async function getRepoRefs(localPath: string): Promise<{
   return result?.ok && result.refs
     ? result.refs
     : { headBranch: null, branches: [], tags: [] };
+}
+
+export async function getRepoMergeBase(localPath: string, refA: string, refB: string): Promise<string> {
+  const result = await bridge()?.mergeBase({ localPath, refA, refB });
+  return result?.ok && result.commit ? result.commit : '';
+}
+
+export async function getRepoFormatPatch(localPath: string, baseRef?: string, single?: string): Promise<string> {
+  const result = await bridge()?.formatPatch({ localPath, baseRef, single });
+  return result?.ok && typeof result.patch === 'string' ? result.patch : '';
 }
 
 export async function cloneRepo(payload: {

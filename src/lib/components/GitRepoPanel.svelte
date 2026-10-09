@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { FolderOpen, GitBranch, GitCommit, HardDrive, Loader2, MessageSquare, GitPullRequest } from '@lucide/svelte';
+  import { FolderOpen, GitBranch, GitCommit, HardDrive, Loader2, MessageSquare, GitPullRequest, FileDiff } from '@lucide/svelte';
   import type { NostrEvent } from '$lib/nostr/types';
   import { GIT_REPO_KIND } from '$lib/nostr/kinds';
   import {
@@ -12,13 +12,15 @@
     getRepoStatus,
     getRepoLog,
     getRepoRemotes,
+    getRepoMergeBase,
+    getRepoFormatPatch,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
     type GitRemote
   } from '$lib/nativeGit';
   import { repoAddress, gitRepoByAddress } from '$lib/stores/gitRepos';
-  import { publishGitIssue, publishGitPullRequest } from '$lib/stores/app';
+  import { publishGitIssue, publishGitPullRequest, publishGitPatch } from '$lib/stores/app';
 
   export let event: NostrEvent;
 
@@ -45,6 +47,10 @@
   let prPublishing = false;
   let prError = '';
   let prRemotes: GitRemote[] = [];
+  let patchOpen = false;
+  let patchTargetBranch = '';
+  let patchPublishing = false;
+  let patchError = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: entry = $gitRepoByAddress.get(address);
@@ -232,6 +238,51 @@
       prError = err instanceof Error ? err.message : 'Could not publish pull request.';
     }
   }
+
+  function openPatch() {
+    patchTargetBranch = defaultBranch || 'main';
+    patchError = '';
+    patchOpen = true;
+  }
+
+  async function publishPatch() {
+    if (!entry?.localPath) return;
+    const branch = status?.branch || '';
+    const tip = commits[0];
+    if (!branch || !tip?.sha) {
+      patchError = 'Could not determine current branch or tip commit.';
+      return;
+    }
+    patchPublishing = true;
+    patchError = '';
+    try {
+      const remoteRef = `origin/${patchTargetBranch}`;
+      const base = await getRepoMergeBase(entry.localPath, 'HEAD', remoteRef);
+      if (!base) {
+        patchPublishing = false;
+        patchError = `Could not find merge base with ${remoteRef}. Fetch the remote first.`;
+        return;
+      }
+      const patch = await getRepoFormatPatch(entry.localPath, base);
+      if (!patch.trim()) {
+        patchPublishing = false;
+        patchError = 'No commits to publish as a patch.';
+        return;
+      }
+      await publishGitPatch({
+        repoAddress: address,
+        patch,
+        tipCommit: tip.sha,
+        parentCommit: tip.parents[0] ?? ''
+      });
+      patchPublishing = false;
+      patchOpen = false;
+      patchTargetBranch = defaultBranch || 'main';
+    } catch (err) {
+      patchPublishing = false;
+      patchError = err instanceof Error ? err.message : 'Could not publish patch.';
+    }
+  }
 </script>
 
 {#if hasBridge}
@@ -243,6 +294,7 @@
           <GitCommit size={14} /> {expanded ? 'Hide' : 'Details'}
         </button>
         <button class="git-button" on:click={openPr} disabled={busy}><GitPullRequest size={14} /> New PR</button>
+        <button class="git-button" on:click={openPatch} disabled={busy}><FileDiff size={14} /> New patch</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
         {#if cloneUrls.length}
@@ -342,6 +394,31 @@
             <button disabled={prPublishing} on:click={() => (prOpen = false)}>Cancel</button>
             <button class="primary" disabled={prPublishing || !prSubject.trim()} on:click={publishPr}>
               {prPublishing ? 'Publishing...' : 'Publish'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if patchOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !patchPublishing && (patchOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="patch-repo-title">
+        <div class="dialog-head">
+          <h2 id="patch-repo-title">New patch</h2>
+          <button class="icon-button small" aria-label="Close" disabled={patchPublishing} on:click={() => (patchOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <label>
+            Target branch
+            <input type="text" bind:value={patchTargetBranch} placeholder="main" />
+          </label>
+          <p class="git-description">Publishes commits between origin/{patchTargetBranch} and HEAD as a kind 1617 patch.</p>
+          {#if patchError}<p class="error">{patchError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={patchPublishing} on:click={() => (patchOpen = false)}>Cancel</button>
+            <button class="primary" disabled={patchPublishing || !patchTargetBranch.trim()} on:click={publishPatch}>
+              {patchPublishing ? 'Publishing...' : 'Publish'}
             </button>
           </div>
         </div>

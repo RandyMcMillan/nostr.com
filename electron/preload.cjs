@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld('nostrGit', {
   stage: (payload) => ipcRenderer.invoke('nostr-git:stage', payload),
   unstage: (payload) => ipcRenderer.invoke('nostr-git:unstage', payload),
   refs: (payload) => ipcRenderer.invoke('nostr-git:refs', payload),
+  mergeBase: (payload) => ipcRenderer.invoke('nostr-git:merge-base', payload),
+  formatPatch: (payload) => ipcRenderer.invoke('nostr-git:format-patch', payload),
   clone: (payload) => ipcRenderer.invoke('nostr-git:clone', payload),
   init: (payload) => ipcRenderer.invoke('nostr-git:init', payload),
   remove: (payload) => ipcRenderer.invoke('nostr-git:remove', payload),

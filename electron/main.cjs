@@ -20,6 +20,8 @@ const {
   stageFile,
   unstageFile,
   getRefs,
+  getMergeBase,
+  formatPatch,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -505,6 +507,32 @@ function registerNostrGitHandlers() {
       return { ok: true, refs };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not read refs.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:merge-base', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const refA = typeof payload?.refA === 'string' ? payload.refA : '';
+    const refB = typeof payload?.refB === 'string' ? payload.refB : '';
+    if (!localPath || !refA || !refB) return { ok: false, error: 'Missing path or refs.' };
+    try {
+      const commit = await getMergeBase(localPath, refA, refB);
+      return { ok: true, commit };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not compute merge base.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:format-patch', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const patch = await formatPatch(localPath, payload?.baseRef, {
+        single: payload?.single
+      });
+      return { ok: true, patch };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not format patch.' };
     }
   });
 
