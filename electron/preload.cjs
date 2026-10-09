@@ -29,5 +29,11 @@ contextBridge.exposeInMainWorld('nostrGit', {
   init: (payload) => ipcRenderer.invoke('nostr-git:init', payload),
   remove: (payload) => ipcRenderer.invoke('nostr-git:remove', payload),
   openFolder: (payload) => ipcRenderer.invoke('nostr-git:open-folder', payload),
-  chooseFolder: () => ipcRenderer.invoke('nostr-git:choose-folder')
+  chooseFolder: () => ipcRenderer.invoke('nostr-git:choose-folder'),
+  onCloneProgress: (callback) => {
+    const channel = 'nostr-git:clone-progress';
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.off(channel, listener);
+  }
 });

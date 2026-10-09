@@ -393,16 +393,19 @@ function registerNostrGitHandlers() {
     return { ok: true, localPath: result.filePaths[0] };
   });
 
-  ipcMain.handle('nostr-git:clone', async (_event, payload) => {
+  ipcMain.handle('nostr-git:clone', async (event, payload) => {
     try {
       const { kind, pubkey, identifier } = validateRepoIdentity(payload);
       const url = typeof payload?.url === 'string' ? payload.url : '';
       if (!url) return { ok: false, error: 'Missing clone URL.' };
 
+      const address = gitStore.repoAddress(kind, pubkey, identifier);
       const localPath = repoLocalPath(kind, pubkey, identifier);
       await cloneRepository(url, localPath, {
         defaultBranch: payload?.defaultBranch,
         branch: payload?.branch
+      }, (text) => {
+        event.sender.send('nostr-git:clone-progress', { address, text });
       });
 
       const metadata = { url, clonedAt: Date.now() };

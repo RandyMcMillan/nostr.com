@@ -57,6 +57,7 @@ interface NostrGitBridge {
   remove: (payload: { kind: number; pubkey: string; identifier: string }) => Promise<{ ok: boolean; error?: string }>;
   openFolder: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string }>;
   chooseFolder: () => Promise<{ ok: boolean; error?: string; canceled?: boolean; localPath?: string }>;
+  onCloneProgress: (callback: (data: { address: string; text: string }) => void) => () => void;
 }
 
 declare global {
@@ -127,4 +128,11 @@ export async function openRepoFolder(localPath: string): Promise<{ ok: boolean; 
 
 export async function chooseRepoFolder(): Promise<{ ok: boolean; error?: string; canceled?: boolean; localPath?: string }> {
   return (await bridge()?.chooseFolder()) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export function onCloneProgress(callback: (data: { address: string; text: string }) => void): () => void {
+  if (!browser || !window.nostrGit?.onCloneProgress) {
+    return () => {};
+  }
+  return window.nostrGit.onCloneProgress(callback);
 }

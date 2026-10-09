@@ -11,6 +11,7 @@
     openRepoFolder,
     getRepoStatus,
     getRepoLog,
+    onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo
   } from '$lib/nativeGit';
@@ -29,6 +30,7 @@
   let status: GitStatus | null = null;
   let commits: GitCommitInfo[] = [];
   let expanded = false;
+  let progressText = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: entry = $gitRepoByAddress.get(address);
@@ -38,6 +40,10 @@
     if (entry?.localPath) {
       void loadRepoDetails();
     }
+    return onCloneProgress((data) => {
+      if (data.address !== address) return;
+      progressText = data.text;
+    });
   });
 
   async function loadRepoDetails() {
@@ -58,6 +64,7 @@
     busy = true;
     error = '';
     message = 'Cloning...';
+    progressText = '';
     try {
       const result = await cloneRepo({
         kind: GIT_REPO_KIND,
@@ -68,6 +75,7 @@
         branch: defaultBranch
       });
       busy = false;
+      progressText = '';
       if (result.ok && result.localPath) {
         message = 'Cloned';
         await loadRepoDetails();
@@ -77,6 +85,7 @@
       }
     } catch (err) {
       busy = false;
+      progressText = '';
       error = err instanceof Error ? err.message : 'Clone failed.';
       message = '';
     }
@@ -168,6 +177,7 @@
     </div>
 
     {#if message}<span class="git-message">{message}</span>{/if}
+    {#if progressText}<span class="git-message progress">{progressText}</span>{/if}
     {#if error}<span class="git-error">{error}</span>{/if}
 
     {#if expanded && entry}
