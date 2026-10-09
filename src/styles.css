@@ -129,7 +129,7 @@ label span, label strong { color: var(--text); }
 }
 .authed-shell {
   display: grid;
-  grid-template-columns: 258px minmax(0, 610px) minmax(310px, 370px);
+  grid-template-columns: 100px minmax(0, 610px) minmax(0px, 0px);
   gap: 0;
   max-width: 1238px;
   min-height: 100svh;
@@ -209,7 +209,8 @@ label span, label strong { color: var(--text); }
 }
 .left-nav-list .nav-compose {
   margin-top: 14px;
-  width: 100%;
+  margin-left: 5px;
+  width: 35%;
   min-height: 52px;
   justify-content: center;
   border: 1px solid var(--text);
