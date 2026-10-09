@@ -8,7 +8,7 @@ const { getRemotes, addRemote } = require('./remote.cjs');
 const { initRepository } = require('./init.cjs');
 const { fetchRepository } = require('./fetch.cjs');
 const { pullRepository } = require('./pull.cjs');
-const { getBranches, checkoutBranch } = require('./branch.cjs');
+const { getBranches, checkoutBranch, deleteBranch } = require('./branch.cjs');
 const { commit } = require('./commit.cjs');
 const { pushRepository } = require('./push.cjs');
 const { getDiff, stageFile, unstageFile } = require('./diff.cjs');
@@ -30,6 +30,7 @@ module.exports = {
   pullRepository,
   getBranches,
   checkoutBranch,
+  deleteBranch,
   commit,
   pushRepository,
   getDiff,

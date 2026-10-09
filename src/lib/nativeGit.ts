@@ -44,6 +44,7 @@ interface NostrGitBridge {
   pull: (payload: { localPath: string; ffOnly?: boolean; rebase?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   branches: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; branches?: { name: string; current: boolean }[] }>;
   checkout: (payload: { localPath: string; branchName: string; create?: boolean }) => Promise<{ ok: boolean; error?: string }>;
+  deleteBranch: (payload: { localPath: string; branchName: string; force?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   commit: (payload: { localPath: string; message: string; allowEmpty?: boolean; authorName?: string; authorEmail?: string }) => Promise<{ ok: boolean; error?: string }>;
   push: (payload: { localPath: string; remote?: string; branch?: string; forceWithLease?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   diff: (payload: { localPath: string; filePath?: string; staged?: boolean }) => Promise<{ ok: boolean; error?: string; diff?: string }>;
@@ -125,6 +126,10 @@ export async function getRepoBranches(localPath: string): Promise<{ name: string
 
 export async function checkoutRepoBranch(localPath: string, branchName: string, create = false): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.checkout({ localPath, branchName, create })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function deleteRepoBranch(localPath: string, branchName: string, force = false): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.deleteBranch({ localPath, branchName, force })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export async function commitRepo(

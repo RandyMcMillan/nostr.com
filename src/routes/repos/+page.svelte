@@ -13,6 +13,7 @@
     pullRepo,
     getRepoBranches,
     checkoutRepoBranch,
+    deleteRepoBranch,
     commitRepo,
     pushRepo,
     getRepoDiff,
@@ -154,6 +155,25 @@
       await loadRepos();
       await loadBranches(repo);
       selectedBranch[repo.address] = name;
+    }
+  }
+
+  async function deleteBranch(repo: GitRepoEntry) {
+    error = '';
+    const branchName = selectedBranch[repo.address];
+    if (!branchName) return;
+    const current = branches.get(repo.address)?.find((b) => b.current);
+    if (current?.name === branchName) {
+      error = 'Switch to another branch before deleting the current one.';
+      return;
+    }
+    if (!window.confirm(`Delete branch “${branchName}”?`)) return;
+    const result = await deleteRepoBranch(repo.localPath, branchName, true);
+    if (!result.ok) {
+      error = result.error || 'Delete branch failed.';
+    } else {
+      selectedBranch[repo.address] = '';
+      await loadBranches(repo);
     }
   }
 
@@ -371,6 +391,7 @@
                 {/each}
               </select>
               <button disabled={!selectedBranch[repo.address]} on:click={() => checkout(repo)}>Checkout</button>
+              <button class="danger-button" disabled={!selectedBranch[repo.address]} on:click={() => deleteBranch(repo)}>Delete</button>
             </div>
             <div class="repo-branch-row">
               <input type="text" bind:value={newBranchName[repo.address]} placeholder="new branch" />

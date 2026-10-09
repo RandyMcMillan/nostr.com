@@ -23,4 +23,11 @@ async function checkoutBranch(repoPath, branchName, create = false) {
   await runGit(args, repoPath);
 }
 
-module.exports = { getBranches, checkoutBranch };
+async function deleteBranch(repoPath, branchName, force = false) {
+  const args = ['branch'];
+  args.push(force ? '-D' : '-d');
+  args.push(branchName);
+  await runGit(args, repoPath);
+}
+
+module.exports = { getBranches, checkoutBranch, deleteBranch };

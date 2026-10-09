@@ -14,6 +14,7 @@ const {
   pullRepository,
   getBranches,
   checkoutBranch,
+  deleteBranch,
   commit,
   pushRepository,
   getDiff,
@@ -430,6 +431,19 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Checkout failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:delete-branch', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const branchName = typeof payload?.branchName === 'string' ? payload.branchName : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    if (!branchName) return { ok: false, error: 'Missing branch name.' };
+    try {
+      await deleteBranch(localPath, branchName, payload?.force);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Delete branch failed.' };
     }
   });
 
