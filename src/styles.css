@@ -1618,6 +1618,45 @@ label span, label strong { color: var(--text); }
   color: var(--muted);
   font-size: 13px;
 }
+.repo-list {
+  display: grid;
+  gap: 10px;
+}
+.repo-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 58%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 82%, var(--text) 4%);
+}
+.repo-meta {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.repo-meta strong {
+  overflow-wrap: anywhere;
+}
+.repo-path {
+  color: var(--muted);
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.repo-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.repo-actions {
+  display: flex;
+  gap: 6px;
+}
 
 /* right column  */
 .rail {

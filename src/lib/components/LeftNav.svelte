@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     Bell,
+    GitBranch,
     Home,
     Mail,
     MoreHorizontal,
@@ -16,7 +17,8 @@
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
     { href: '/notifications', label: 'Notifications', icon: Bell },
-    { href: '/messages', label: 'Messages', icon: Mail }
+    { href: '/messages', label: 'Messages', icon: Mail },
+    { href: '/repos', label: 'Repositories', icon: GitBranch }
   ];
 
   $: profileHref = $session ? `/profile/${$session.pubkey}` : '/';
