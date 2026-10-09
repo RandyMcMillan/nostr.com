@@ -180,6 +180,9 @@ import {
     : '';
   $: gitStatusRepoOwner = gitStatusRepoAddress ? gitStatusRepoAddress.split(':')[1] : '';
   $: canSetGitStatus = Boolean($session?.pubkey && gitStatusRepoOwner && $session.pubkey === gitStatusRepoOwner);
+  $: gitLabels = displayEvent.tags
+    .filter((tag) => tag[0] === 't' && tag[1] && tag[1] !== 'root')
+    .map((tag) => tag[1]);
   $: repostActionActive = reposted || ownQuoteRepost;
   $: canZap = Boolean(zapInfo && $session);
   $: zapTitle = !$session ? 'Sign in to zap' : zapInfo ? 'Zap this post' : zapChecking ? 'Checking zap support' : 'This user has not enabled zaps';
@@ -678,6 +681,13 @@ import {
           {:else}
             {#if gitSubject}<strong class="git-title">{gitSubject}</strong>{/if}
             {#if gitRepoAddress}<p class="git-repo">{gitRepoAddress}</p>{/if}
+          {/if}
+          {#if gitLabels.length}
+            <div class="git-labels">
+              {#each gitLabels as label (label)}
+                <span class="git-label">{label}</span>
+              {/each}
+            </div>
           {/if}
           {#if displayEvent.kind === 30617}
             <GitRepoPanel event={displayEvent} />
