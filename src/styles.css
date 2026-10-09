@@ -129,17 +129,19 @@ label span, label strong { color: var(--text); }
 }
 .authed-shell {
   display: grid;
-  grid-template-columns: 100px minmax(0, 610px) minmax(0px, 0px);
+  /* control 3 column layout */
+  grid-template-columns: 100px minmax(0, 1000px) minmax(0px, 300px);
   gap: 0;
   max-width: 1238px;
   min-height: 100svh;
   margin: 0 auto;
 }
 .authed-shell.rail-collapsed {
-  grid-template-columns: 258px minmax(0, 922px) 58px;
+  grid-template-columns: 100px minmax(0, 100%) 58px;
 }
 .authed-main {
   min-width: 0;
+  max-width: 400;
   overflow-x: clip;
   border-left: 1px solid var(--line);
   border-right: 1px solid var(--line);
@@ -153,11 +155,13 @@ label span, label strong { color: var(--text); }
   gap: 16px;
   padding: 14px 18px 18px;
 }
+/* add gnostr.svg here */
 .left-logo {
   width: fit-content;
-  font-size: 28px;
+  height: fit-content;
+  font-size: 64px;
   font-weight: 950;
-  padding: 4px 14px 10px;
+  padding: 4px 4px 4px;
 }
 .left-nav-head {
   display: flex;
@@ -167,8 +171,8 @@ label span, label strong { color: var(--text); }
 }
 .nav-tools,
 .topbar-actions {
-  display: flex;
-  align-items: center;
+  display: grid;
+  align-items: right;
   gap: 8px;
 }
 .guest-theme-toggle {
@@ -1484,6 +1488,7 @@ label span, label strong { color: var(--text); }
   color: var(--accent);
   font-weight: 800;
 }
+/* right column  */
 .rail {
   position: sticky;
   top: 0;
