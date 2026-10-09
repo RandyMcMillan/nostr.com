@@ -35,10 +35,7 @@
 
 <aside class="left-nav" aria-label="Primary">
   <div class="left-nav-head">
-    <a class="left-logo" href={appPath('/')} aria-label="Nostr home" on:click={goHome}>nostr</a>
-    <div class="nav-tools">
-      <ThemeToggle />
-    </div>
+    <a class="left-logo" href={appPath('/')} aria-label="Nostr home" on:click={goHome}><!-- place gnostr.svg here --></a>
   </div>
 
   <nav class="left-nav-list">
@@ -65,7 +62,10 @@
       <MoreHorizontal size={26} />
     </a>
     <button class="nav-compose" on:click={startCompose}>
-      <PencilLine size={26} />
+      <PencilLine size={32} />
     </button>
+    <div class="nav-tools">
+      <ThemeToggle />
+    </div>
   </nav>
 </aside>
