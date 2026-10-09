@@ -199,7 +199,10 @@ label span, label strong { color: var(--text); }
   align-items: center;
   border: 0;
   border-radius: 0px;
-  padding: 0px 0px 0px 18px;
+  /* align nav icon in box up/down*/
+  padding-top: 5px;
+  /* align nav icon in box left/right*/
+  padding-left: 20px;
     /*
   color: var(--text);
   background: transparent;
@@ -217,7 +220,7 @@ label span, label strong { color: var(--text); }
   margin-top: 32px;
   /* move compose button left/right */
   margin-left: 0px;
-  /* align icon in box left/right*/
+  /* align compose icon in box left/right*/
   padding-right: 15px;
   width: 64px;
   min-height: 64px;
