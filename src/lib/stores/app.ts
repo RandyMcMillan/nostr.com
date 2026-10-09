@@ -1757,6 +1757,33 @@ export async function publishGitPatch(input: GitPatchInput) {
   return event;
 }
 
+export async function publishGitStatus(rootEvent: NostrEvent, statusKind: number, note = '') {
+  const currentSession = get(session);
+  if (!currentSession) throw new Error('Sign in before publishing.');
+
+  const repoAddressTag = rootEvent.tags.find((tag) => tag[0] === 'a' && tag[1]?.startsWith('30617:'));
+  if (!repoAddressTag?.[1]) throw new Error('Could not find repository address.');
+  const repoAddress = repoAddressTag[1];
+  const owner = repoAddress.split(':')[1];
+  if (!owner) throw new Error('Invalid repository address.');
+
+  const { GIT_STATUS_KINDS } = await import('$lib/nostr/kinds');
+  if (!GIT_STATUS_KINDS.includes(statusKind)) throw new Error('Invalid status kind.');
+
+  const tags: string[][] = [
+    ['e', rootEvent.id, '', 'root'],
+    ['p', owner],
+    ['p', rootEvent.pubkey],
+    ['a', repoAddress]
+  ];
+
+  const event = await signEvent(currentSession, statusKind, note, tags);
+  events.update((existing) => mergeEvents([event], existing));
+  void cacheEvents([event]);
+  enqueuePublish(event);
+  return event;
+}
+
 function enqueuePublish(event: NostrEvent) {
   if (pendingPublishEvents.has(event.id)) return;
   pendingPublishEvents.set(event.id, { event, attempts: 0, nextAttemptAt: Date.now() });

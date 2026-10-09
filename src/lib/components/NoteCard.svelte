@@ -8,10 +8,23 @@
   import { nip19 } from 'nostr-tools';
   import type { NostrEvent, Profile } from '$lib/nostr/types';
   import { extractMediaAttachments, extractQuotedNoteReferences, extractSocialEmbeds, isQuoteRepostEvent, parseNoteText } from '$lib/nostr/media';
-import { COMMENT_KIND, GIT_PATCH_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGitRootKind } from '$lib/nostr/kinds';
+import {
+  COMMENT_KIND,
+  GIT_PATCH_KIND,
+  GIT_PR_KIND,
+  GIT_ISSUE_KIND,
+  GIT_ROOT_KINDS,
+  GIT_STATUS_OPEN_KIND,
+  GIT_STATUS_APPLIED_KIND,
+  GIT_STATUS_CLOSED_KIND,
+  GIT_STATUS_DRAFT_KIND,
+  GIT_STATUS_KINDS,
+  isAddressableKind,
+  isGitRootKind
+} from '$lib/nostr/kinds';
   import { activeRelayUrls, fetchLikeAuthors, fetchProfiles, subscribeZapReceipts } from '$lib/nostr/client';
   import { createZapInvoice, loadZapInfo, type ZapInfo } from '$lib/nostr/zap';
-  import { deleteNote, displayEventForEvent, filterByHashtag, likedStateForEvent, mergeProfileRecords, muteAccount, prefetchThreadPreview, profiles, reactToNote, refreshEventStats, relays, reportNote, repostedStateForEvent, repostNote, session, startEdit, startQuote, startReply, statsForEvent, watchVisibleNoteStats } from '$lib/stores/app';
+  import { deleteNote, displayEventForEvent, filterByHashtag, likedStateForEvent, mergeProfileRecords, muteAccount, prefetchThreadPreview, profiles, publishGitStatus, reactToNote, refreshEventStats, relays, reportNote, repostedStateForEvent, repostNote, session, startEdit, startQuote, startReply, statsForEvent, watchVisibleNoteStats } from '$lib/stores/app';
   import { appPath } from '$lib/paths';
   import { pauseWhenHidden } from '$lib/actions/pauseWhenHidden';
   import { lazyContentRootMargin, prefersLeanMedia } from '$lib/clientCapabilities';
@@ -162,6 +175,11 @@ import { COMMENT_KIND, GIT_PATCH_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddre
   $: reposted = $repostedStore;
   $: isOwnPost = $session?.pubkey === event.pubkey;
   $: ownQuoteRepost = isOwnPost && isQuoteRepostEvent(displayEvent);
+  $: gitStatusRepoAddress = [GIT_PATCH_KIND, GIT_PR_KIND, GIT_ISSUE_KIND].includes(displayEvent.kind)
+    ? displayEvent.tags.find((tag) => tag[0] === 'a' && tag[1]?.startsWith('30617:'))?.[1] ?? ''
+    : '';
+  $: gitStatusRepoOwner = gitStatusRepoAddress ? gitStatusRepoAddress.split(':')[1] : '';
+  $: canSetGitStatus = Boolean($session?.pubkey && gitStatusRepoOwner && $session.pubkey === gitStatusRepoOwner);
   $: repostActionActive = reposted || ownQuoteRepost;
   $: canZap = Boolean(zapInfo && $session);
   $: zapTitle = !$session ? 'Sign in to zap' : zapInfo ? 'Zap this post' : zapChecking ? 'Checking zap support' : 'This user has not enabled zaps';
@@ -415,6 +433,16 @@ import { COMMENT_KIND, GIT_PATCH_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddre
     await muteAccount(event.pubkey);
   }
 
+  async function setGitStatus(kind: number) {
+    menuOpen = false;
+    try {
+      await publishGitStatus(displayEvent, kind);
+    } catch (err) {
+      // Status publish failures are best-effort; avoid crashing the card.
+      console.error('Failed to publish git status:', err);
+    }
+  }
+
   function updateStatsVisibility(visible: boolean) {
     if (visible === statsVisible) return;
     statsVisible = visible;
@@ -605,6 +633,13 @@ import { COMMENT_KIND, GIT_PATCH_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddre
               {/if}
               {#if !isOwnPost}
                 <button disabled={!$session} on:click={() => void muteAuthor()}><UserX size={16} /> Mute account</button>
+              {/if}
+              {#if canSetGitStatus}
+                <div class="note-menu-divider" role="separator"></div>
+                <button on:click={() => setGitStatus(GIT_STATUS_OPEN_KIND)}>Mark open</button>
+                <button on:click={() => setGitStatus(GIT_STATUS_CLOSED_KIND)}>Mark closed</button>
+                <button on:click={() => setGitStatus(GIT_STATUS_APPLIED_KIND)}>Mark applied/resolved</button>
+                <div class="note-menu-divider" role="separator"></div>
               {/if}
               <a href={appPath(`/embed/${event.id}`)} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Open embed</a>
             </div>

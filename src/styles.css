@@ -1053,6 +1053,11 @@ label span, label strong { color: var(--text); }
 .note-menu-popover a:hover {
   background: color-mix(in srgb, var(--text) 8%, transparent);
 }
+.note-menu-divider {
+  height: 1px;
+  margin: 6px 10px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+}
 .note-content {
   position: relative;
   min-width: 0;
