@@ -8,7 +8,7 @@
   import { nip19 } from 'nostr-tools';
   import type { NostrEvent, Profile } from '$lib/nostr/types';
   import { extractMediaAttachments, extractQuotedNoteReferences, extractSocialEmbeds, isQuoteRepostEvent, parseNoteText } from '$lib/nostr/media';
-import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGitRootKind } from '$lib/nostr/kinds';
+import { COMMENT_KIND, GIT_PATCH_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGitRootKind } from '$lib/nostr/kinds';
   import { activeRelayUrls, fetchLikeAuthors, fetchProfiles, subscribeZapReceipts } from '$lib/nostr/client';
   import { createZapInvoice, loadZapInfo, type ZapInfo } from '$lib/nostr/zap';
   import { deleteNote, displayEventForEvent, filterByHashtag, likedStateForEvent, mergeProfileRecords, muteAccount, prefetchThreadPreview, profiles, reactToNote, refreshEventStats, relays, reportNote, repostedStateForEvent, repostNote, session, startEdit, startQuote, startReply, statsForEvent, watchVisibleNoteStats } from '$lib/stores/app';
@@ -128,9 +128,11 @@ import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGi
   $: name = profile?.display_name || profile?.name || displayEvent.pubkey.slice(0, 10);
   $: avatar = profile?.picture;
   $: safeTags = displayEvent.tags.slice(0, maxRenderableTags);
-  $: parsedContent = displayEvent.content.slice(0, maxParsedContentLength);
-  $: renderedContent = displayEvent.content.slice(0, maxExpandedContentLength);
-  $: contentWasCapped = displayEvent.content.length > maxExpandedContentLength;
+  $: isGitPatch = displayEvent.kind === GIT_PATCH_KIND;
+  $: displayContent = isGitPatch ? '(patch contents)' : displayEvent.content;
+  $: parsedContent = displayContent.slice(0, maxParsedContentLength);
+  $: renderedContent = displayContent.slice(0, maxExpandedContentLength);
+  $: contentWasCapped = displayContent.length > maxExpandedContentLength;
   $: mediaLimit = leanMedia ? maxLeanMediaAttachments : maxMediaAttachments;
   $: mediaAttachments = heavyContentReady ? extractMediaAttachments({ ...displayEvent, content: parsedContent, tags: safeTags }).slice(0, mediaLimit) : [];
   $: socialEmbeds = heavyContentReady ? extractSocialEmbeds(parsedContent).slice(0, leanMedia ? 1 : maxSocialEmbeds) : [];
@@ -138,7 +140,7 @@ import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGi
   $: allQuotedNoteReferences = heavyContentReady ? extractQuotedNoteReferences(parsedContent, safeTags).slice(0, maxQuotedNotes) : [];
   $: quotedNoteReferences = allQuotedNoteReferences.filter((reference) => !hiddenQuotedNoteIdSet.has(reference.id));
   $: quotedNoteRawValues = allQuotedNoteReferences.map((reference) => reference.raw);
-  $: isLong = displayEvent.content.length > previewLength;
+  $: isLong = displayContent.length > previewLength;
   $: visibleContent = !isLong || expanded ? renderedContent : renderedContent.slice(0, previewLength).trimEnd();
   $: isGitRoot = isGitRootKind(displayEvent.kind);
   $: isGitThreadReply = displayEvent.kind === COMMENT_KIND || GIT_STATUS_KINDS.includes(displayEvent.kind);
@@ -217,6 +219,8 @@ import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGi
     if (note.kind === COMMENT_KIND || GIT_STATUS_KINDS.includes(note.kind)) {
       const rootTag = note.tags.find((tag) => (tag[0] === 'E' || tag[0] === 'A') && tag[1]);
       if (rootTag?.[1]) return rootTag[1];
+      const markerRoot = note.tags.find((tag) => tag[0] === 'e' && tag[1] && tag[3] === 'root');
+      if (markerRoot?.[1]) return markerRoot[1];
     }
     if (note.kind !== 1) return note.id;
     const rootTag = note.tags.find((tag) => tag[0] === 'e' && tag[1] && tag[3] === 'root');
@@ -633,6 +637,9 @@ import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGi
                 {/each}
               </ul>
             {/if}
+          {:else if displayEvent.kind === GIT_PATCH_KIND}
+            <strong class="git-title">Patch</strong>
+            {#if gitRepoAddress}<p class="git-repo">{gitRepoAddress}</p>{/if}
           {:else}
             {#if gitSubject}<strong class="git-title">{gitSubject}</strong>{/if}
             {#if gitRepoAddress}<p class="git-repo">{gitRepoAddress}</p>{/if}
