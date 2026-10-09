@@ -172,7 +172,7 @@ label span, label strong { color: var(--text); }
 .nav-tools,
 .topbar-actions {
   display: grid;
-  align-items: right;
+  align-items: center;
   gap: 8px;
 }
 .guest-theme-toggle {
@@ -224,14 +224,14 @@ label span, label strong { color: var(--text); }
   padding-top: 0px;
   /* align compose icon in box left/right*/
   padding-right: 20px;
-  width: 64px;
-  min-height: 64px;
-  justify-content: center;
-  border: 1px solid var(--text);
-  background: var(--text);
-  color: var(--bg); /* icon color */
-  font-size: 17px;
-  font-weight: 850;
+  widt_h: 64px;
+  min-heig_ht: 64px;
+  just_ify-content: center;
+  bord_er: 1px solid var(--text);
+  back_ground: var(--text);
+  colo_r: var(--bg); /* icon color */
+  fon_t-size: 17px;
+  fon_t-weight: 850;
 }
 .left-nav-list .nav-compose:hover {
   background: var(--text);
@@ -801,7 +801,8 @@ label span, label strong { color: var(--text); }
 .danger-button:hover {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
-.icon-button { width: 42px; padding: 0; flex: 0 0 42px; }
+/* light/dark button */
+.icon-button { width: 42px; padding-right: 16px; flex: 0 0 42px; }
 .icon-button.small { width: 32px; min-height: 32px; flex-basis: 32px; border: 0; }
 .feed-list { display: grid; min-width: 0; }
 .authed-main .feed-list { padding: 0 18px; }
