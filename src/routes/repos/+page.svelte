@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { FolderOpen, GitBranch, Trash2, RefreshCw, Loader2 } from '@lucide/svelte';
+  import { FolderOpen, GitBranch, Trash2, RefreshCw, Loader2, PencilLine } from '@lucide/svelte';
   import { appPath } from '$lib/paths';
   import { publishGitRepo, type GitRepoAnnouncement } from '$lib/stores/app';
   import {
@@ -13,6 +13,7 @@
     pullRepo,
     getRepoBranches,
     checkoutRepoBranch,
+    commitRepo,
     type GitRepoEntry,
     type GitStatus
   } from '$lib/nativeGit';
@@ -33,6 +34,11 @@
     cloneUrls: [''],
     defaultBranch: 'main'
   };
+  let commitOpen = false;
+  let commitMessage = '';
+  let selectedCommitRepo: GitRepoEntry | null = null;
+  let committing = false;
+  let commitError = '';
 
   onMount(() => {
     void loadRepos();
@@ -154,6 +160,29 @@
     }
   }
 
+  function openCommit(repo: GitRepoEntry) {
+    selectedCommitRepo = repo;
+    commitMessage = '';
+    commitError = '';
+    commitOpen = true;
+  }
+
+  async function doCommit() {
+    if (!selectedCommitRepo || !commitMessage.trim()) return;
+    committing = true;
+    commitError = '';
+    const result = await commitRepo(selectedCommitRepo.localPath, commitMessage.trim());
+    committing = false;
+    if (result.ok) {
+      commitOpen = false;
+      selectedCommitRepo = null;
+      commitMessage = '';
+      await loadRepos();
+    } else {
+      commitError = result.error || 'Commit failed.';
+    }
+  }
+
   function addCloneUrl() {
     publishForm.cloneUrls = [...publishForm.cloneUrls, ''];
   }
@@ -219,6 +248,7 @@
             <div class="repo-actions">
               <button class="icon-button" title="Fetch" on:click={() => fetch(repo)}><RefreshCw size={16} /></button>
               <button class="icon-button" title="Pull" on:click={() => pull(repo)}><GitBranch size={16} /></button>
+              <button class="icon-button" title="Commit" on:click={() => openCommit(repo)}><PencilLine size={16} /></button>
               <button class="icon-button" title="Open folder" on:click={() => openFolder(repo)}><FolderOpen size={16} /></button>
               <button class="icon-button danger-icon" title="Forget" on:click={() => forget(repo)}><Trash2 size={16} /></button>
             </div>
@@ -238,6 +268,30 @@
     {/if}
   {/if}
 </article>
+
+{#if commitOpen && selectedCommitRepo}
+  <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !committing && (commitOpen = false)}>
+    <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="commit-repo-title">
+      <div class="dialog-head">
+        <h2 id="commit-repo-title">Commit changes</h2>
+        <button class="icon-button small" aria-label="Close" disabled={committing} on:click={() => (commitOpen = false)}>×</button>
+      </div>
+      <div class="profile-editor">
+        <label>
+          Commit message
+          <textarea bind:value={commitMessage} placeholder="Describe your changes" rows="3"></textarea>
+        </label>
+        {#if commitError}<p class="error">{commitError}</p>{/if}
+        <div class="dialog-actions">
+          <button disabled={committing} on:click={() => (commitOpen = false)}>Cancel</button>
+          <button class="primary" disabled={committing || !commitMessage.trim()} on:click={doCommit}>
+            {committing ? 'Committing...' : 'Commit'}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
 
 {#if publishOpen}
   <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !publishing && (publishOpen = false)}>

@@ -44,6 +44,7 @@ interface NostrGitBridge {
   pull: (payload: { localPath: string; ffOnly?: boolean; rebase?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   branches: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; branches?: { name: string; current: boolean }[] }>;
   checkout: (payload: { localPath: string; branchName: string; create?: boolean }) => Promise<{ ok: boolean; error?: string }>;
+  commit: (payload: { localPath: string; message: string; allowEmpty?: boolean; authorName?: string; authorEmail?: string }) => Promise<{ ok: boolean; error?: string }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -113,6 +114,10 @@ export async function getRepoBranches(localPath: string): Promise<{ name: string
 
 export async function checkoutRepoBranch(localPath: string, branchName: string, create = false): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.checkout({ localPath, branchName, create })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function commitRepo(localPath: string, message: string, options: { allowEmpty?: boolean; authorName?: string; authorEmail?: string } = {}): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.commit({ localPath, message, ...options })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export async function cloneRepo(payload: {

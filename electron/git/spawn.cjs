@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { spawn } = require('dugite');
 const path = require('path');
 

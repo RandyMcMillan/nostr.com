@@ -14,6 +14,7 @@ const {
   pullRepository,
   getBranches,
   checkoutBranch,
+  commit,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -422,6 +423,23 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Checkout failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:commit', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const message = typeof payload?.message === 'string' ? payload.message : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    if (!message) return { ok: false, error: 'Missing commit message.' };
+    try {
+      await commit(localPath, message, {
+        allowEmpty: payload?.allowEmpty,
+        authorName: payload?.authorName,
+        authorEmail: payload?.authorEmail
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Commit failed.' };
     }
   });
 

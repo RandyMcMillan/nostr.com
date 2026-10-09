@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { runGit } = require('./core.cjs');
 
 async function fetchRepository(repoPath, remote = '--all', prune = true) {

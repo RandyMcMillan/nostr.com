@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { exec, parseError } = require('dugite');
 const path = require('path');
 

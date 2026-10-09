@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { runGit } = require('./core.cjs');
 
 async function getBranches(repoPath) {

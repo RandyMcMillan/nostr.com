@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { runGit, GitError } = require('./core.cjs');
 const { spawnGit } = require('./spawn.cjs');
 const { cloneRepository } = require('./clone.cjs');

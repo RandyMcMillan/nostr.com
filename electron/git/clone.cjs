@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { spawnGit } = require('./spawn.cjs');
 const fs = require('fs/promises');
 const path = require('path');

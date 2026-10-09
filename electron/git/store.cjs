@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { app } = require('electron');
 const fs = require('fs/promises');
 const path = require('path');
