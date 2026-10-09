@@ -19,3 +19,15 @@ contextBridge.exposeInMainWorld('nostrDesktopNotifications', {
 contextBridge.exposeInMainWorld('nostrDesktopApp', {
   version: () => ipcRenderer.invoke('app-info:version')
 });
+
+contextBridge.exposeInMainWorld('nostrGit', {
+  list: () => ipcRenderer.invoke('nostr-git:list'),
+  status: (payload) => ipcRenderer.invoke('nostr-git:status', payload),
+  log: (payload) => ipcRenderer.invoke('nostr-git:log', payload),
+  remotes: (payload) => ipcRenderer.invoke('nostr-git:remotes', payload),
+  clone: (payload) => ipcRenderer.invoke('nostr-git:clone', payload),
+  init: (payload) => ipcRenderer.invoke('nostr-git:init', payload),
+  remove: (payload) => ipcRenderer.invoke('nostr-git:remove', payload),
+  openFolder: (payload) => ipcRenderer.invoke('nostr-git:open-folder', payload),
+  chooseFolder: () => ipcRenderer.invoke('nostr-git:choose-folder')
+});

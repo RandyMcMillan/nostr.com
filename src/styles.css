@@ -1499,6 +1499,126 @@ label span, label strong { color: var(--text); }
   color: var(--accent);
   font-weight: 800;
 }
+
+.git-preview {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 58%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 82%, var(--text) 4%);
+}
+.git-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+}
+.git-description,
+.git-clone,
+.git-repo {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.git-clone {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+}
+.git-repo-panel {
+  display: grid;
+  gap: 8px;
+}
+.git-repo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.git-button {
+  min-height: 32px;
+  gap: 6px;
+  padding: 0 10px;
+  border-color: color-mix(in srgb, var(--line) 58%, transparent);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+.git-button.primary {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.git-button:disabled {
+  opacity: 0.5;
+}
+.git-message,
+.git-error {
+  margin: 0;
+  font-size: 13px;
+}
+.git-message {
+  color: var(--muted);
+}
+.git-error {
+  color: var(--danger);
+}
+.git-repo-details {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+.git-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.git-status span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.git-commits {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.git-commits li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  font-size: 13px;
+}
+.git-commits code {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+.git-commit-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.git-commit-meta {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.git-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 /* right column  */
 .rail {
   position: sticky;

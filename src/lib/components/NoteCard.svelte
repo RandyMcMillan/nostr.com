@@ -21,6 +21,8 @@ import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGi
   import ImageViewer from './ImageViewer.svelte';
   import QuotedNotePreview from './QuotedNotePreview.svelte';
   import VideoAttachment from './VideoAttachment.svelte';
+  import GitRepoPanel from './GitRepoPanel.svelte';
+  import { refreshGitRepos } from '$lib/stores/gitRepos';
 
   export let event: NostrEvent;
   export let profile: Profile | undefined;
@@ -88,6 +90,7 @@ import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGi
 
   onMount(() => {
     if (!browser || embedded) return;
+    if (isGitRoot) void refreshGitRepos();
     leanMedia = prefersLeanMedia();
     if (!('IntersectionObserver' in window)) {
       statsVisible = true;
@@ -611,6 +614,9 @@ import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGi
           {:else}
             {#if gitSubject}<strong class="git-title">{gitSubject}</strong>{/if}
             {#if gitRepoAddress}<p class="git-repo">{gitRepoAddress}</p>{/if}
+          {/if}
+          {#if displayEvent.kind === 30617}
+            <GitRepoPanel event={displayEvent} />
           {/if}
         </div>
       {/if}

@@ -1,0 +1,21 @@
+const { runGit, GitError } = require('./core.cjs');
+const { spawnGit } = require('./spawn.cjs');
+const { cloneRepository } = require('./clone.cjs');
+const { getRepositoryStatus } = require('./status.cjs');
+const { getRepositoryLog } = require('./log.cjs');
+const { getRemotes, addRemote } = require('./remote.cjs');
+const { initRepository } = require('./init.cjs');
+const store = require('./store.cjs');
+
+module.exports = {
+  runGit,
+  GitError,
+  spawnGit,
+  cloneRepository,
+  getRepositoryStatus,
+  getRepositoryLog,
+  getRemotes,
+  addRemote,
+  initRepository,
+  store
+};

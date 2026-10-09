@@ -1,8 +1,17 @@
-const { app, BrowserWindow, Notification, ipcMain, safeStorage, shell } = require('electron');
+const { app, BrowserWindow, Notification, ipcMain, safeStorage, shell, dialog, Menu, autoUpdater } = require('electron');
 const fs = require('fs');
 const fsp = require('fs/promises');
 const http = require('http');
 const path = require('path');
+
+const {
+  cloneRepository,
+  getRepositoryStatus,
+  getRepositoryLog,
+  getRemotes,
+  initRepository,
+  store: gitStore
+} = require('./git/index.cjs');
 
 let server;
 let mainWindow;
@@ -10,6 +19,55 @@ let appBaseUrl;
 let pendingNostrUrl = '';
 const secureSessionFile = 'secure-private-key-session.dat';
 const appUserModelId = 'com.lnbits.nostr.social';
+const windowStateFile = 'window-state.json';
+const defaultWindowBounds = { width: 1180, height: 840, x: undefined, y: undefined, maximized: false };
+
+function windowStatePath() {
+  return path.join(app.getPath('userData'), windowStateFile);
+}
+
+async function readWindowState() {
+  try {
+    const raw = await fsp.readFile(windowStatePath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    return { ...defaultWindowBounds, ...parsed };
+  } catch {
+    return { ...defaultWindowBounds };
+  }
+}
+
+async function saveWindowState() {
+  if (!mainWindow) return;
+  const bounds = mainWindow.getBounds();
+  const state = {
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
+    maximized: mainWindow.isMaximized()
+  };
+  try {
+    await fsp.mkdir(app.getPath('userData'), { recursive: true });
+    await fsp.writeFile(windowStatePath(), JSON.stringify(state));
+  } catch {
+    // Window state is best-effort.
+  }
+}
+
+function windowBoundsForDisplay(state) {
+  const { screen } = require('electron');
+  const display = screen.getDisplayMatching({ x: state.x ?? 0, y: state.y ?? 0, width: state.width, height: state.height });
+  const workArea = display.workArea;
+  const width = Math.min(state.width, workArea.width);
+  const height = Math.min(state.height, workArea.height);
+  let x = state.x;
+  let y = state.y;
+  if (x === undefined || y === undefined || x < workArea.x - width + 80 || x > workArea.x + workArea.width - 80 || y < workArea.y - height + 80 || y > workArea.y + workArea.height - 80) {
+    x = undefined;
+    y = undefined;
+  }
+  return { width, height, x, y };
+}
 
 function createStaticServer() {
   const root = path.join(__dirname, '..', 'build');
@@ -46,9 +104,10 @@ function createStaticServer() {
 
 async function createWindow() {
   appBaseUrl = appBaseUrl || (await createStaticServer());
+  const state = await readWindowState();
+  const bounds = windowBoundsForDisplay(state);
   mainWindow = new BrowserWindow({
-    width: 1180,
-    height: 840,
+    ...bounds,
     minWidth: 420,
     minHeight: 680,
     title: 'Nostr Social',
@@ -88,6 +147,13 @@ async function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = undefined;
   });
+  mainWindow.on('resize', () => saveWindowState());
+  mainWindow.on('move', () => saveWindowState());
+  mainWindow.on('maximize', () => saveWindowState());
+  mainWindow.on('unmaximize', () => saveWindowState());
+  if (state.maximized) {
+    mainWindow.maximize();
+  }
   await mainWindow.loadURL(appBaseUrl);
   if (pendingNostrUrl) {
     const url = pendingNostrUrl;
@@ -249,6 +315,127 @@ function registerAppInfoHandlers() {
   ipcMain.handle('app-info:version', () => app.getVersion());
 }
 
+function reposBasePath() {
+  return path.join(app.getPath('userData'), 'nostr-repos');
+}
+
+function sanitizeFolderName(name) {
+  return name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120) || 'repo';
+}
+
+function repoLocalPath(kind, pubkey, identifier) {
+  const folderName = `${kind}_${pubkey.slice(0, 16)}_${sanitizeFolderName(identifier)}`;
+  return path.join(reposBasePath(), folderName);
+}
+
+function validateRepoIdentity(payload) {
+  const kind = Number(payload?.kind);
+  const pubkey = typeof payload?.pubkey === 'string' ? payload.pubkey : '';
+  const identifier = typeof payload?.identifier === 'string' ? payload.identifier : '';
+  if (!Number.isFinite(kind) || kind < 1) throw new Error('Invalid repo kind.');
+  if (!pubkey) throw new Error('Missing repo pubkey.');
+  if (!identifier) throw new Error('Missing repo identifier.');
+  return { kind, pubkey, identifier };
+}
+
+function registerNostrGitHandlers() {
+  ipcMain.handle('nostr-git:list', async () => gitStore.listRepos());
+
+  ipcMain.handle('nostr-git:status', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const status = await getRepositoryStatus(localPath);
+      return { ok: true, status };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not read status.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:log', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const limit = Number.isFinite(payload?.limit) ? payload.limit : 20;
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const commits = await getRepositoryLog(localPath, limit);
+      return { ok: true, commits };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not read log.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:remotes', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const remotes = await getRemotes(localPath);
+      return { ok: true, remotes };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not read remotes.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:open-folder', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    const error = await shell.openPath(localPath);
+    return { ok: !error, error: error || undefined };
+  });
+
+  ipcMain.handle('nostr-git:choose-folder', async () => {
+    if (!mainWindow) return { ok: false, error: 'No main window.' };
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory']
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: false, canceled: true };
+    }
+    return { ok: true, localPath: result.filePaths[0] };
+  });
+
+  ipcMain.handle('nostr-git:clone', async (_event, payload) => {
+    try {
+      const { kind, pubkey, identifier } = validateRepoIdentity(payload);
+      const url = typeof payload?.url === 'string' ? payload.url : '';
+      if (!url) return { ok: false, error: 'Missing clone URL.' };
+
+      const localPath = repoLocalPath(kind, pubkey, identifier);
+      await cloneRepository(url, localPath, {
+        defaultBranch: payload?.defaultBranch,
+        branch: payload?.branch
+      });
+
+      const metadata = { url, clonedAt: Date.now() };
+      await gitStore.setRepoEntry(kind, pubkey, identifier, localPath, metadata);
+      return { ok: true, localPath };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Clone failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:init', async (_event, payload) => {
+    try {
+      const { kind, pubkey, identifier } = validateRepoIdentity(payload);
+      const localPath = repoLocalPath(kind, pubkey, identifier);
+      await initRepository(localPath, payload?.defaultBranch);
+      await gitStore.setRepoEntry(kind, pubkey, identifier, localPath, { initializedAt: Date.now() });
+      return { ok: true, localPath };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Init failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:remove', async (_event, payload) => {
+    try {
+      const { kind, pubkey, identifier } = validateRepoIdentity(payload);
+      await gitStore.removeRepoEntry(kind, pubkey, identifier);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Remove failed.' };
+    }
+  });
+}
+
 async function uploadToNostrBuild(payload) {
   const authorization = typeof payload?.authorization === 'string' ? payload.authorization : '';
   const mediaType = ['avatar', 'banner', 'media'].includes(payload?.mediaType) ? payload.mediaType : 'media';
@@ -299,6 +486,95 @@ function openAppRoute(route = '/') {
   void mainWindow.loadURL(`${appBaseUrl}${route}`);
 }
 
+function createApplicationMenu() {
+  const isMac = process.platform === 'darwin';
+  const template = [
+    ...(isMac
+      ? [
+          {
+            label: app.getName(),
+            submenu: [
+              { role: 'about' },
+              { type: 'separator' },
+              { role: 'hide' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit' }
+            ]
+          }
+        ]
+      : []),
+    {
+      label: 'File',
+      submenu: [isMac ? { role: 'close' } : { role: 'quit' }]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'close' },
+        ...(isMac
+          ? [
+              { type: 'separator' },
+              { role: 'front' },
+              { type: 'separator' },
+              { role: 'window' }
+            ]
+          : [])
+      ]
+    },
+    {
+      role: 'help',
+      submenu: [
+        {
+          label: 'Learn More',
+          click: async () => {
+            await shell.openExternal('https://nostr.com');
+          }
+        }
+      ]
+    }
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
+function registerUpdaterStub() {
+  try {
+    autoUpdater.on('error', () => {});
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+  } catch {
+    // Updater is a stub until a feed URL is configured.
+  }
+}
+
 if (process.platform === 'win32') app.setAppUserModelId(appUserModelId);
 registerNostrProtocol();
 openNostrUrl(findNostrUrl());
@@ -317,10 +593,13 @@ if (!gotSingleInstanceLock) {
   });
 
   app.whenReady().then(() => {
+    createApplicationMenu();
     registerAppInfoHandlers();
     registerSecureSessionHandlers();
     registerUploadHandlers();
     registerNotificationHandlers();
+    registerNostrGitHandlers();
+    registerUpdaterStub();
     return createWindow();
   });
 }
