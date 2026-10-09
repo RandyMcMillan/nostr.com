@@ -49,6 +49,11 @@ interface NostrGitBridge {
   diff: (payload: { localPath: string; filePath?: string; staged?: boolean }) => Promise<{ ok: boolean; error?: string; diff?: string }>;
   stage: (payload: { localPath: string; filePath?: string }) => Promise<{ ok: boolean; error?: string }>;
   unstage: (payload: { localPath: string; filePath?: string }) => Promise<{ ok: boolean; error?: string }>;
+  refs: (payload: { localPath: string }) => Promise<{
+    ok: boolean;
+    error?: string;
+    refs?: { headBranch: string | null; branches: { name: string; commit: string }[]; tags: { name: string; commit: string }[] };
+  }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -143,6 +148,17 @@ export async function stageRepoFile(localPath: string, filePath?: string): Promi
 
 export async function unstageRepoFile(localPath: string, filePath?: string): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.unstage({ localPath, filePath })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function getRepoRefs(localPath: string): Promise<{
+  headBranch: string | null;
+  branches: { name: string; commit: string }[];
+  tags: { name: string; commit: string }[];
+}> {
+  const result = await bridge()?.refs({ localPath });
+  return result?.ok && result.refs
+    ? result.refs
+    : { headBranch: null, branches: [], tags: [] };
 }
 
 export async function cloneRepo(payload: {

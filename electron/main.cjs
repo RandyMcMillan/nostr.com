@@ -19,6 +19,7 @@ const {
   getDiff,
   stageFile,
   unstageFile,
+  getRefs,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -493,6 +494,17 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Unstage failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:refs', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const refs = await getRefs(localPath);
+      return { ok: true, refs };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not read refs.' };
     }
   });
 

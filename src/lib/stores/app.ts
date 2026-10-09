@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
-import { writable, type Readable } from 'svelte/store';
+import { writable, type Readable, get } from 'svelte/store';
 import {
   cacheEvents,
   cacheEventStats,
@@ -1601,6 +1601,45 @@ export async function publishGitRepo(announcement: GitRepoAnnouncement) {
   }
 
   const event = await signEvent(currentSession, GIT_REPO_KIND, '', tags);
+  events.update((existing) => mergeEvents([event], existing));
+  void cacheEvents([event]);
+  enqueuePublish(event);
+  return event;
+}
+
+export interface GitRepoState {
+  address: string;
+  refs: {
+    headBranch: string | null;
+    branches: { name: string; commit: string }[];
+    tags: { name: string; commit: string }[];
+  };
+}
+
+export async function publishGitRepoState(state: GitRepoState) {
+  const currentSession = get(session);
+  if (!currentSession) throw new Error('Sign in before publishing.');
+
+  const parts = state.address.split(':');
+  if (parts.length < 3) throw new Error('Invalid repository address.');
+  const [kind, pubkey, ...identifierParts] = parts;
+  if (Number(kind) !== 30617) throw new Error('Not a repository announcement address.');
+  if (pubkey !== currentSession.pubkey) throw new Error('Only the repository owner can publish state.');
+  const identifier = identifierParts.join(':');
+
+  const { GIT_REPO_STATE_KIND } = await import('$lib/nostr/kinds');
+  const tags: string[][] = [['d', identifier]];
+  if (state.refs.headBranch) {
+    tags.push(['HEAD', `ref: refs/heads/${state.refs.headBranch}`]);
+  }
+  for (const branch of state.refs.branches) {
+    tags.push([`refs/heads/${branch.name}`, branch.commit]);
+  }
+  for (const tag of state.refs.tags) {
+    tags.push([`refs/tags/${tag.name}`, tag.commit]);
+  }
+
+  const event = await signEvent(currentSession, GIT_REPO_STATE_KIND, '', tags);
   events.update((existing) => mergeEvents([event], existing));
   void cacheEvents([event]);
   enqueuePublish(event);

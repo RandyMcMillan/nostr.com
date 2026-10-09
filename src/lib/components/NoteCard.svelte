@@ -147,6 +147,13 @@ import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGi
   $: gitCloneUrls = displayEvent.tags.filter((tag) => tag[0] === 'clone').map((tag) => tag[1]);
   $: gitSubject = displayEvent.tags.find((tag) => tag[0] === 'subject')?.[1] ?? '';
   $: gitRepoAddress = displayEvent.tags.find((tag) => tag[0] === 'a' && tag[1]?.startsWith('30617:'))?.[1] ?? '';
+  $: gitStateHead = displayEvent.tags.find((tag) => tag[0] === 'HEAD')?.[1] ?? '';
+  $: gitStateBranches = displayEvent.tags
+    .filter((tag) => tag[0]?.startsWith('refs/heads/'))
+    .map((tag) => ({ name: tag[0].slice('refs/heads/'.length), commit: tag[1] ?? '' }));
+  $: gitStateTags = displayEvent.tags
+    .filter((tag) => tag[0]?.startsWith('refs/tags/'))
+    .map((tag) => ({ name: tag[0].slice('refs/tags/'.length), commit: tag[1] ?? '' }));
   $: contentParts = parseNoteText(visibleContent, [...mediaAttachments.map((media) => media.url), ...socialEmbeds.map((embed) => embed.url), ...quotedNoteRawValues], safeTags).slice(0, maxRenderedTextParts);
   $: counts = $statsStore;
   $: liked = $likedStore;
@@ -611,6 +618,21 @@ import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGi
             {#if gitCloneUrls.length}<p class="git-clone">{gitCloneUrls[0]}</p>{/if}
           {:else if displayEvent.kind === 30618}
             <strong class="git-title">Repository state</strong>
+            {#if gitStateHead}<p class="git-description">{gitStateHead}</p>{/if}
+            {#if gitStateBranches.length}
+              <ul class="git-ref-list">
+                {#each gitStateBranches as branch (branch.name)}
+                  <li><span class="git-ref-name">{branch.name}</span> <span class="git-ref-commit">{branch.commit.slice(0, 8)}</span></li>
+                {/each}
+              </ul>
+            {/if}
+            {#if gitStateTags.length}
+              <ul class="git-ref-list">
+                {#each gitStateTags as tag (tag.name)}
+                  <li><span class="git-ref-name">{tag.name}</span> <span class="git-ref-commit">{tag.commit.slice(0, 8)}</span></li>
+                {/each}
+              </ul>
+            {/if}
           {:else}
             {#if gitSubject}<strong class="git-title">{gitSubject}</strong>{/if}
             {#if gitRepoAddress}<p class="git-repo">{gitRepoAddress}</p>{/if}

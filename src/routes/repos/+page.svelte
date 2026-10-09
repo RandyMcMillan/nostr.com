@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { FolderOpen, GitBranch, Trash2, RefreshCw, Loader2, PencilLine, Send, ChevronDown, ChevronRight, FileText } from '@lucide/svelte';
+  import { FolderOpen, GitBranch, Trash2, RefreshCw, Loader2, PencilLine, Send, ChevronDown, ChevronRight, FileText, UploadCloud } from '@lucide/svelte';
   import { appPath } from '$lib/paths';
-  import { publishGitRepo, type GitRepoAnnouncement } from '$lib/stores/app';
+  import { publishGitRepo, publishGitRepoState, type GitRepoAnnouncement } from '$lib/stores/app';
   import {
     isGitBridgeAvailable,
     listLocalRepos,
@@ -18,6 +18,7 @@
     getRepoDiff,
     stageRepoFile,
     unstageRepoFile,
+    getRepoRefs,
     type GitRepoEntry,
     type GitStatus,
     type GitStatusFile
@@ -32,6 +33,7 @@
   let publishOpen = false;
   let publishing = false;
   let publishError = '';
+  let publishingStateAddress = '';
   let publishForm: GitRepoAnnouncement = {
     name: '',
     identifier: '',
@@ -165,6 +167,19 @@
     } catch (err) {
       publishing = false;
       publishError = err instanceof Error ? err.message : 'Publish failed.';
+    }
+  }
+
+  async function publishState(repo: GitRepoEntry) {
+    error = '';
+    publishingStateAddress = repo.address;
+    try {
+      const refs = await getRepoRefs(repo.localPath);
+      await publishGitRepoState({ address: repo.address, refs });
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Publish state failed.';
+    } finally {
+      publishingStateAddress = '';
     }
   }
 
@@ -325,6 +340,9 @@
               <button class="icon-button" title="Pull" on:click={() => pull(repo)}><GitBranch size={16} /></button>
               <button class="icon-button" title="Push" on:click={() => push(repo)}><Send size={16} /></button>
               <button class="icon-button" title="Commit" on:click={() => openCommit(repo)}><PencilLine size={16} /></button>
+              <button class="icon-button" title="Publish state" disabled={publishingStateAddress === repo.address} on:click={() => publishState(repo)}>
+                {#if publishingStateAddress === repo.address}<Loader2 size={16} class="spin" />{:else}<UploadCloud size={16} />{/if}
+              </button>
               <button class="icon-button" title="Open folder" on:click={() => openFolder(repo)}><FolderOpen size={16} /></button>
               <button class="icon-button danger-icon" title="Forget" on:click={() => forget(repo)}><Trash2 size={16} /></button>
             </div>

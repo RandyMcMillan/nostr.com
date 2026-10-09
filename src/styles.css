@@ -1531,6 +1531,27 @@ label span, label strong { color: var(--text); }
   display: grid;
   gap: 8px;
 }
+.git-ref-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 3px;
+}
+.git-ref-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.git-ref-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.git-ref-commit {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
 .git-repo-actions {
   display: flex;
   flex-wrap: wrap;

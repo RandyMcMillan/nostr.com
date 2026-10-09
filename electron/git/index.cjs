@@ -12,6 +12,7 @@ const { getBranches, checkoutBranch } = require('./branch.cjs');
 const { commit } = require('./commit.cjs');
 const { pushRepository } = require('./push.cjs');
 const { getDiff, stageFile, unstageFile } = require('./diff.cjs');
+const { getRefs } = require('./refs.cjs');
 const store = require('./store.cjs');
 
 module.exports = {
@@ -33,5 +34,6 @@ module.exports = {
   getDiff,
   stageFile,
   unstageFile,
+  getRefs,
   store
 };
