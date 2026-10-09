@@ -12,6 +12,8 @@ const {
   initRepository,
   fetchRepository,
   pullRepository,
+  getBranches,
+  checkoutBranch,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -396,6 +398,30 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Pull failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:branches', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const branches = await getBranches(localPath);
+      return { ok: true, branches };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not list branches.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:checkout', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const branchName = typeof payload?.branchName === 'string' ? payload.branchName : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    if (!branchName) return { ok: false, error: 'Missing branch name.' };
+    try {
+      await checkoutBranch(localPath, branchName, payload?.create);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Checkout failed.' };
     }
   });
 

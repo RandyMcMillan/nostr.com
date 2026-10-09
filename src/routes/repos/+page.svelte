@@ -10,6 +10,8 @@
     removeRepoEntry,
     fetchRepo,
     pullRepo,
+    getRepoBranches,
+    checkoutRepoBranch,
     type GitRepoEntry,
     type GitStatus
   } from '$lib/nativeGit';
@@ -18,6 +20,8 @@
   let loading = false;
   let error = '';
   let statuses = new Map<string, GitStatus | null>();
+  let branches = new Map<string, { name: string; current: boolean }[]>();
+  let selectedBranch: Record<string, string> = {};
 
   onMount(() => {
     void loadRepos();
@@ -86,6 +90,30 @@
     }
   }
 
+  async function loadBranches(repo: GitRepoEntry) {
+    error = '';
+    const list = await getRepoBranches(repo.localPath);
+    branches.set(repo.address, list);
+    branches = branches;
+    const current = list.find((b) => b.current);
+    if (current) {
+      selectedBranch[repo.address] = current.name;
+    }
+  }
+
+  async function checkout(repo: GitRepoEntry) {
+    error = '';
+    const branchName = selectedBranch[repo.address];
+    if (!branchName) return;
+    const result = await checkoutRepoBranch(repo.localPath, branchName);
+    if (!result.ok) {
+      error = result.error || 'Checkout failed.';
+    } else {
+      await loadRepos();
+      await loadBranches(repo);
+    }
+  }
+
   function repoName(repo: GitRepoEntry): string {
     const identifier = repo.address.split(':').slice(2).join(':') || 'repo';
     return identifier;
@@ -142,6 +170,16 @@
               <button class="icon-button" title="Pull" on:click={() => pull(repo)}><GitBranch size={16} /></button>
               <button class="icon-button" title="Open folder" on:click={() => openFolder(repo)}><FolderOpen size={16} /></button>
               <button class="icon-button danger-icon" title="Forget" on:click={() => forget(repo)}><Trash2 size={16} /></button>
+            </div>
+            <div class="repo-branch-row">
+              <select bind:value={selectedBranch[repo.address]} on:click={() => !branches.has(repo.address) && loadBranches(repo)}>
+                {#each branches.get(repo.address) ?? [] as branch (branch.name)}
+                  <option value={branch.name}>{branch.current ? '* ' : ''}{branch.name}</option>
+                {:else}
+                  <option value="">branch...</option>
+                {/each}
+              </select>
+              <button disabled={!selectedBranch[repo.address]} on:click={() => checkout(repo)}>Checkout</button>
             </div>
           </div>
         {/each}

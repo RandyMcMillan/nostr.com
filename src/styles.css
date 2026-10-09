@@ -1657,6 +1657,23 @@ label span, label strong { color: var(--text); }
   display: flex;
   gap: 6px;
 }
+.repo-branch-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.repo-branch-row select {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.repo-branch-row button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+}
 
 /* right column  */
 .rail {

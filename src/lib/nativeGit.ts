@@ -42,6 +42,8 @@ interface NostrGitBridge {
   remotes: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; remotes?: GitRemote[] }>;
   fetch: (payload: { localPath: string; remote?: string; prune?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   pull: (payload: { localPath: string; ffOnly?: boolean; rebase?: boolean }) => Promise<{ ok: boolean; error?: string }>;
+  branches: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; branches?: { name: string; current: boolean }[] }>;
+  checkout: (payload: { localPath: string; branchName: string; create?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -102,6 +104,15 @@ export async function fetchRepo(localPath: string, remote?: string, prune = true
 
 export async function pullRepo(localPath: string, options: { ffOnly?: boolean; rebase?: boolean } = {}): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.pull({ localPath, ...options })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function getRepoBranches(localPath: string): Promise<{ name: string; current: boolean }[]> {
+  const result = await bridge()?.branches({ localPath });
+  return result?.ok && result.branches ? result.branches : [];
+}
+
+export async function checkoutRepoBranch(localPath: string, branchName: string, create = false): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.checkout({ localPath, branchName, create })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export async function cloneRepo(payload: {
