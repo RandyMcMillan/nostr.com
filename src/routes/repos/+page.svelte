@@ -49,6 +49,7 @@
   let expandedRepos = new Set<string>();
   let selectedFile: Record<string, string> = {};
   let fileDiffs = new Map<string, string>();
+  let newBranchName: Record<string, string> = {};
 
   onMount(() => {
     void loadRepos();
@@ -138,6 +139,21 @@
     } else {
       await loadRepos();
       await loadBranches(repo);
+    }
+  }
+
+  async function createBranch(repo: GitRepoEntry) {
+    error = '';
+    const name = newBranchName[repo.address]?.trim();
+    if (!name) return;
+    const result = await checkoutRepoBranch(repo.localPath, name, true);
+    if (!result.ok) {
+      error = result.error || 'Create branch failed.';
+    } else {
+      newBranchName[repo.address] = '';
+      await loadRepos();
+      await loadBranches(repo);
+      selectedBranch[repo.address] = name;
     }
   }
 
@@ -355,6 +371,10 @@
                 {/each}
               </select>
               <button disabled={!selectedBranch[repo.address]} on:click={() => checkout(repo)}>Checkout</button>
+            </div>
+            <div class="repo-branch-row">
+              <input type="text" bind:value={newBranchName[repo.address]} placeholder="new branch" />
+              <button disabled={!newBranchName[repo.address]?.trim()} on:click={() => createBranch(repo)}>Create</button>
             </div>
             {#if expandedRepos.has(repo.address)}
               <div class="repo-file-list">
