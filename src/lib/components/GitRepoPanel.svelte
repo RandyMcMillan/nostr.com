@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { FolderOpen, GitBranch, GitCommit, HardDrive, Loader2 } from '@lucide/svelte';
+  import { FolderOpen, GitBranch, GitCommit, HardDrive, Loader2, MessageSquare } from '@lucide/svelte';
   import type { NostrEvent } from '$lib/nostr/types';
   import { GIT_REPO_KIND } from '$lib/nostr/kinds';
   import {
@@ -16,6 +16,7 @@
     type GitCommit as GitCommitInfo
   } from '$lib/nativeGit';
   import { repoAddress, gitRepoByAddress } from '$lib/stores/gitRepos';
+  import { publishGitIssue } from '$lib/stores/app';
 
   export let event: NostrEvent;
 
@@ -31,6 +32,11 @@
   let commits: GitCommitInfo[] = [];
   let expanded = false;
   let progressText = '';
+  let issueOpen = false;
+  let issueSubject = '';
+  let issueBody = '';
+  let issuePublishing = false;
+  let issueError = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: entry = $gitRepoByAddress.get(address);
@@ -153,6 +159,33 @@
       void loadRepoDetails();
     }
   }
+
+  function openIssue() {
+    issueSubject = '';
+    issueBody = '';
+    issueError = '';
+    issueOpen = true;
+  }
+
+  async function publishIssue() {
+    if (!issueSubject.trim()) return;
+    issuePublishing = true;
+    issueError = '';
+    try {
+      await publishGitIssue({
+        repoAddress: address,
+        subject: issueSubject.trim(),
+        content: issueBody.trim()
+      });
+      issuePublishing = false;
+      issueOpen = false;
+      issueSubject = '';
+      issueBody = '';
+    } catch (err) {
+      issuePublishing = false;
+      issueError = err instanceof Error ? err.message : 'Could not publish issue.';
+    }
+  }
 </script>
 
 {#if hasBridge}
@@ -174,6 +207,9 @@
           {#if busy}<Loader2 size={14} class="spin" />{:else}<GitBranch size={14} />{/if} Init local
         </button>
       {/if}
+    </div>
+    <div class="git-repo-actions">
+      <button class="git-button" on:click={openIssue} disabled={busy}><MessageSquare size={14} /> New issue</button>
     </div>
 
     {#if message}<span class="git-message">{message}</span>{/if}
@@ -206,4 +242,32 @@
       </div>
     {/if}
   </div>
+
+  {#if issueOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !issuePublishing && (issueOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="issue-repo-title">
+        <div class="dialog-head">
+          <h2 id="issue-repo-title">New issue</h2>
+          <button class="icon-button small" aria-label="Close" disabled={issuePublishing} on:click={() => (issueOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <label>
+            Subject
+            <input type="text" bind:value={issueSubject} placeholder="Short summary" />
+          </label>
+          <label>
+            Body
+            <textarea bind:value={issueBody} placeholder="Describe the issue" rows="5"></textarea>
+          </label>
+          {#if issueError}<p class="error">{issueError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={issuePublishing} on:click={() => (issueOpen = false)}>Cancel</button>
+            <button class="primary" disabled={issuePublishing || !issueSubject.trim()} on:click={publishIssue}>
+              {issuePublishing ? 'Publishing...' : 'Publish'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
 {/if}
