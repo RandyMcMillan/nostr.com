@@ -15,6 +15,7 @@ const {
   getBranches,
   checkoutBranch,
   commit,
+  pushRepository,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -440,6 +441,19 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Commit failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:push', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await pushRepository(localPath, payload?.remote, payload?.branch, {
+        forceWithLease: payload?.forceWithLease
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Push failed.' };
     }
   });
 

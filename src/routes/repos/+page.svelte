@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { FolderOpen, GitBranch, Trash2, RefreshCw, Loader2, PencilLine } from '@lucide/svelte';
+  import { FolderOpen, GitBranch, Trash2, RefreshCw, Loader2, PencilLine, Send } from '@lucide/svelte';
   import { appPath } from '$lib/paths';
   import { publishGitRepo, type GitRepoAnnouncement } from '$lib/stores/app';
   import {
@@ -14,6 +14,7 @@
     getRepoBranches,
     checkoutRepoBranch,
     commitRepo,
+    pushRepo,
     type GitRepoEntry,
     type GitStatus
   } from '$lib/nativeGit';
@@ -183,6 +184,16 @@
     }
   }
 
+  async function push(repo: GitRepoEntry) {
+    error = '';
+    const result = await pushRepo(repo.localPath);
+    if (!result.ok) {
+      error = result.error || 'Push failed.';
+    } else {
+      await loadRepos();
+    }
+  }
+
   function addCloneUrl() {
     publishForm.cloneUrls = [...publishForm.cloneUrls, ''];
   }
@@ -248,6 +259,7 @@
             <div class="repo-actions">
               <button class="icon-button" title="Fetch" on:click={() => fetch(repo)}><RefreshCw size={16} /></button>
               <button class="icon-button" title="Pull" on:click={() => pull(repo)}><GitBranch size={16} /></button>
+              <button class="icon-button" title="Push" on:click={() => push(repo)}><Send size={16} /></button>
               <button class="icon-button" title="Commit" on:click={() => openCommit(repo)}><PencilLine size={16} /></button>
               <button class="icon-button" title="Open folder" on:click={() => openFolder(repo)}><FolderOpen size={16} /></button>
               <button class="icon-button danger-icon" title="Forget" on:click={() => forget(repo)}><Trash2 size={16} /></button>

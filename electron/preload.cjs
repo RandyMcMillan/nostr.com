@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('nostrGit', {
   branches: (payload) => ipcRenderer.invoke('nostr-git:branches', payload),
   checkout: (payload) => ipcRenderer.invoke('nostr-git:checkout', payload),
   commit: (payload) => ipcRenderer.invoke('nostr-git:commit', payload),
+  push: (payload) => ipcRenderer.invoke('nostr-git:push', payload),
   clone: (payload) => ipcRenderer.invoke('nostr-git:clone', payload),
   init: (payload) => ipcRenderer.invoke('nostr-git:init', payload),
   remove: (payload) => ipcRenderer.invoke('nostr-git:remove', payload),
