@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { FolderOpen, GitBranch, GitCommit, HardDrive, Loader2, MessageSquare } from '@lucide/svelte';
+  import { FolderOpen, GitBranch, GitCommit, HardDrive, Loader2, MessageSquare, GitPullRequest } from '@lucide/svelte';
   import type { NostrEvent } from '$lib/nostr/types';
   import { GIT_REPO_KIND } from '$lib/nostr/kinds';
   import {
@@ -11,12 +11,14 @@
     openRepoFolder,
     getRepoStatus,
     getRepoLog,
+    getRepoRemotes,
     onCloneProgress,
     type GitStatus,
-    type GitCommit as GitCommitInfo
+    type GitCommit as GitCommitInfo,
+    type GitRemote
   } from '$lib/nativeGit';
   import { repoAddress, gitRepoByAddress } from '$lib/stores/gitRepos';
-  import { publishGitIssue } from '$lib/stores/app';
+  import { publishGitIssue, publishGitPullRequest } from '$lib/stores/app';
 
   export let event: NostrEvent;
 
@@ -37,6 +39,12 @@
   let issueBody = '';
   let issuePublishing = false;
   let issueError = '';
+  let prOpen = false;
+  let prSubject = '';
+  let prBody = '';
+  let prPublishing = false;
+  let prError = '';
+  let prRemotes: GitRemote[] = [];
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: entry = $gitRepoByAddress.get(address);
@@ -186,6 +194,44 @@
       issueError = err instanceof Error ? err.message : 'Could not publish issue.';
     }
   }
+
+  async function openPr() {
+    prSubject = '';
+    prBody = '';
+    prError = '';
+    prRemotes = entry?.localPath ? await getRepoRemotes(entry.localPath) : [];
+    prOpen = true;
+  }
+
+  async function publishPr() {
+    if (!prSubject.trim() || !entry?.localPath) return;
+    const branch = status?.branch || '';
+    const tip = commits[0]?.sha;
+    if (!branch || !tip) {
+      prError = 'Could not determine current branch or tip commit.';
+      return;
+    }
+    prPublishing = true;
+    prError = '';
+    try {
+      await publishGitPullRequest({
+        repoAddress: address,
+        subject: prSubject.trim(),
+        content: prBody.trim(),
+        tipCommit: tip,
+        cloneUrls: prRemotes.map((remote) => remote.url),
+        branchName: branch
+      });
+      prPublishing = false;
+      prOpen = false;
+      prSubject = '';
+      prBody = '';
+      prRemotes = [];
+    } catch (err) {
+      prPublishing = false;
+      prError = err instanceof Error ? err.message : 'Could not publish pull request.';
+    }
+  }
 </script>
 
 {#if hasBridge}
@@ -196,6 +242,7 @@
         <button class="git-button" on:click={toggleExpanded} disabled={busy}>
           <GitCommit size={14} /> {expanded ? 'Hide' : 'Details'}
         </button>
+        <button class="git-button" on:click={openPr} disabled={busy}><GitPullRequest size={14} /> New PR</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
         {#if cloneUrls.length}
@@ -264,6 +311,37 @@
             <button disabled={issuePublishing} on:click={() => (issueOpen = false)}>Cancel</button>
             <button class="primary" disabled={issuePublishing || !issueSubject.trim()} on:click={publishIssue}>
               {issuePublishing ? 'Publishing...' : 'Publish'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if prOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !prPublishing && (prOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="pr-repo-title">
+        <div class="dialog-head">
+          <h2 id="pr-repo-title">New pull request</h2>
+          <button class="icon-button small" aria-label="Close" disabled={prPublishing} on:click={() => (prOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <label>
+            Subject
+            <input type="text" bind:value={prSubject} placeholder="Short summary" />
+          </label>
+          <label>
+            Body
+            <textarea bind:value={prBody} placeholder="Describe the changes" rows="5"></textarea>
+          </label>
+          {#if prRemotes.length}
+            <p class="git-description">Clone URLs: {prRemotes.map((r) => r.url).join(', ')}</p>
+          {/if}
+          {#if prError}<p class="error">{prError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={prPublishing} on:click={() => (prOpen = false)}>Cancel</button>
+            <button class="primary" disabled={prPublishing || !prSubject.trim()} on:click={publishPr}>
+              {prPublishing ? 'Publishing...' : 'Publish'}
             </button>
           </div>
         </div>
