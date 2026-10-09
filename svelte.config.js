@@ -20,7 +20,7 @@ const config = {
       base
     },
     prerender: {
-      entries: ['/', '/info', '/clients', '/nostr-keys', '/pomegranate', '/relays', ...nipEntries]
+      entries: ['/', '/info', '/clients', '/nostr-keys', '/pomegranate', '/relays', '/repos', ...nipEntries]
     }
   }
 };
