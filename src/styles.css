@@ -802,7 +802,7 @@ label span, label strong { color: var(--text); }
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 /* light/dark button */
-.icon-button { width: 42px; padding-right: 16px; flex: 0 0 42px; }
+.icon-button { flex: 0 0 42px; }
 .icon-button.small { width: 32px; min-height: 32px; flex-basis: 32px; border: 0; }
 .feed-list { display: grid; min-width: 0; }
 .authed-main .feed-list { padding: 0 18px; }
@@ -1518,6 +1518,8 @@ label span, label strong { color: var(--text); }
 }
 .rail-toggle {
   justify-self: start;
+  font-size: 11px;
+  font-weight: 800;
 }
 .rail.collapsed .rail-toggle {
   justify-self: center;
