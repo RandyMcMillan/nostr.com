@@ -6,7 +6,7 @@ const mediaUrlPattern = /https?:\/\/[^\s<>"']+\.(?:png|jpe?g|gif|webp|avif|mp4|w
 const webUrlPattern = /https?:\/\/[^\s<>"']+/gi;
 const bareDomainPattern = /(^|[\s([{"'])([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?:\/[^\s<>"']*)?)/gi;
 const hashtagPattern = /(^|[\s([{"'])#([A-Za-z0-9_]{2,64})/g;
-const nostrRefPattern = /(?:nostr:)?((?:npub|nprofile|note|nevent)1[023456789acdefghjklmnpqrstuvwxyz]+)/gi;
+const nostrRefPattern = /(?:nostr:)?((?:npub|nprofile|note|nevent|naddr)1[023456789acdefghjklmnpqrstuvwxyz]+)/gi;
 const nostrThreadUrlPattern = /https?:\/\/(?:www\.)?nostr\.com\/thread\/([0-9a-f]{64})(?:[/?#][^\s<>"']*)?/gi;
 const indexedRefPattern = /#\[(\d+)]/g;
 const mentionPattern = /(^|[\s([{"'])(@([A-Za-z0-9_.-]{2,64})(?:\/([A-Za-z0-9:_-]{4,128}))?)/g;
@@ -96,21 +96,23 @@ export function extractQuotedNoteReferences(content: string, tags: string[][] = 
   while ((match = indexedRefPattern.exec(content))) {
     const tag = tags[Number(match[1])];
     if (tag?.[0] === 'e' && /^[0-9a-f]{64}$/i.test(tag[1])) refs.set(tag[1], { id: tag[1], raw: match[0] });
+    if (tag?.[0] === 'a' && tag[1]) refs.set(tag[1], { id: tag[1], raw: match[0] });
   }
 
   return [...refs.values()];
 }
 
 export function quotedNoteIdsForEvent(event: NostrEvent) {
-  if (event.kind !== 1) return [];
   const ids = new Set(extractQuotedNoteReferences(event.content, event.tags).map((reference) => reference.id));
   event.tags.forEach((tag) => {
     if (tag[0] === 'q' && /^[0-9a-f]{64}$/i.test(tag[1])) ids.add(tag[1].toLowerCase());
+    if (tag[0] === 'a' && tag[1]) ids.add(tag[1]);
   });
   return [...ids];
 }
 
 export function isQuoteRepostEvent(event: NostrEvent) {
+  if (event.kind === 6 || event.kind === 16) return false;
   return quotedNoteIdsForEvent(event).length > 0;
 }
 
@@ -294,6 +296,7 @@ function indexedReferencePart(raw: string, tag: string[] | undefined): NoteTextP
     return { type: 'nostr', value: raw, href: appPath(`/profile/${pubkey}`), label: '@nostr', pubkey };
   }
   if (tag[0] === 'e' && /^[0-9a-f]{64}$/i.test(tag[1])) return { type: 'nostr', value: raw, href: appPath(`/thread/${tag[1].toLowerCase()}`), label: 'note' };
+  if (tag[0] === 'a') return { type: 'nostr', value: raw, href: appPath(`/thread/${encodeURIComponent(tag[1])}`), label: 'repo' };
   return { type: 'text', value: raw };
 }
 
@@ -443,6 +446,7 @@ function hrefForNostrReference(value: string) {
     if (decoded.type === 'nprofile') return appPath(`/profile/${decoded.data.pubkey}`);
     if (decoded.type === 'note') return appPath(`/thread/${decoded.data}`);
     if (decoded.type === 'nevent') return appPath(`/thread/${value}`);
+    if (decoded.type === 'naddr') return appPath(`/thread/${value}`);
   } catch {
     // Leave unknown or future NIP-19 values as external nostr URIs.
   }
@@ -454,6 +458,7 @@ function labelForNostrReference(value: string) {
     const decoded = nip19.decode(value);
     if (decoded.type === 'npub' || decoded.type === 'nprofile') return '@nostr';
     if (decoded.type === 'note' || decoded.type === 'nevent') return 'note';
+    if (decoded.type === 'naddr') return 'repo';
   } catch {
     // fall through
   }
@@ -476,6 +481,7 @@ function noteIdForNostrReference(value: string) {
     const decoded = nip19.decode(value);
     if (decoded.type === 'note') return decoded.data;
     if (decoded.type === 'nevent') return decoded.data.id;
+    if (decoded.type === 'naddr') return `${decoded.data.kind}:${decoded.data.pubkey}:${decoded.data.identifier}`;
   } catch {
     // not a note reference
   }

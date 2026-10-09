@@ -32,6 +32,7 @@ import {
   publishNote,
   topLevelFeedEvents
 } from './client';
+import { GIT_ROOT_KINDS } from './kinds';
 import type { NostrEvent, RelayState, Session } from './types';
 
 const pubkey = 'a'.repeat(64);
@@ -192,9 +193,9 @@ describe('nostr client helpers', () => {
     expect(feedSinceForQuery('global', {}, 1_000_000)).toBe(395_200);
   });
 
-  it('requests reposts for personal feeds because profiles display repost activity too', () => {
-    expect(feedKindsForMode('follow')).toEqual([1, 6]);
-    expect(feedKindsForMode('custom')).toEqual([1, 6]);
+  it('requests reposts and git roots for personal feeds because profiles display repost activity too', () => {
+    expect(feedKindsForMode('follow')).toEqual([1, 6, ...GIT_ROOT_KINDS]);
+    expect(feedKindsForMode('custom')).toEqual([1, 6, ...GIT_ROOT_KINDS]);
     expect(feedKindsForMode('global')).toEqual([1]);
   });
 
@@ -278,6 +279,32 @@ describe('nostr client helpers', () => {
 
     expect(notificationForEvent(first, pubkey, new Map())).toEqual([]);
     expect(notificationForEvent(second, pubkey, new Map())).toEqual([]);
+  });
+
+  it('creates git issue and comment notifications when the user is tagged', () => {
+    const issue = event({ id: '1'.repeat(64), kind: 1621, pubkey: 'b'.repeat(64), tags: [['p', pubkey], ['subject', 'bug']] });
+    const comment = event({
+      id: '2'.repeat(64),
+      kind: 1111,
+      pubkey: 'c'.repeat(64),
+      content: 'looks good',
+      tags: [['E', issue.id, '', issue.pubkey], ['K', '1621'], ['P', issue.pubkey], ['e', issue.id, '', issue.pubkey], ['k', '1621'], ['p', issue.pubkey], ['p', pubkey]]
+    });
+
+    expect(notificationForEvent(issue, pubkey, new Map())).toMatchObject([{ type: 'issue', actor: issue.pubkey, targetId: issue.id }]);
+    expect(notificationForEvent(comment, pubkey, new Map())).toMatchObject([{ type: 'comment', actor: comment.pubkey, targetId: issue.id }]);
+  });
+
+  it('does not reject long git patch bodies as spam', () => {
+    const patch = event({ id: '1'.repeat(64), kind: 1617, content: 'diff --git\n' + 'a\n'.repeat(2000) });
+    expect(filterSpam([patch]).map((item) => item.id)).toContain(patch.id);
+  });
+
+  it('matches deletion requests against addressable git events', () => {
+    const repo = event({ id: '1'.repeat(64), kind: 30617, tags: [['d', 'my-repo']] });
+    const deletion = event({ id: '2'.repeat(64), kind: 5, pubkey: repo.pubkey, tags: [['a', `30617:${repo.pubkey}:my-repo`], ['k', '30617']] });
+
+    expect(filterEventsDeletedByRequests([repo], [deletion])).toEqual([]);
   });
 
 

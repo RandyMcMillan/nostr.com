@@ -142,18 +142,19 @@
   let rightRailCollapsed = false;
   let guestAlgorithmDialogOpen = false;
   $: embeddedPage = $page.route.id?.startsWith('/embed/') ?? false;
+  $: routeId = $page.route.id as string | null;
   $: seo =
-    $page.route.id === '/clients'
+    routeId === '/clients'
       ? clientsSeo
-      : $page.route.id === '/nostr-keys'
+      : routeId === '/nostr-keys'
         ? nostrKeysSeo
-        : $page.route.id === '/pomegranate'
+        : routeId === '/pomegranate'
           ? pomegranateSeo
-          : $page.route.id === '/relays'
+          : routeId === '/relays'
             ? relaysSeo
-            : $page.route.id === '/info'
+            : routeId === '/info'
               ? infoSeo
-              : $page.route.id === '/'
+              : routeId === '/'
                 ? homeSeo
                 : null;
   $: canonicalUrl = seo ? `${siteUrl}${seo.path}` : siteUrl;
@@ -272,13 +273,13 @@
     <title>{seo.title}</title>
     <meta name="description" content={seo.description} />
     <link rel="canonical" href={canonicalUrl} />
-    <meta property="og:type" content={$page.route.id === '/info' || $page.route.id === '/clients' || $page.route.id === '/nostr-keys' || $page.route.id === '/pomegranate' || $page.route.id === '/relays' ? 'article' : 'website'} />
+    <meta property="og:type" content={routeId === '/info' || routeId === '/clients' || routeId === '/nostr-keys' || routeId === '/pomegranate' || routeId === '/relays' ? 'article' : 'website'} />
     <meta property="og:site_name" content="nostr" />
     <meta property="og:title" content={seo.title} />
     <meta property="og:description" content={seo.description} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={previewImageUrl} />
-    <meta property="og:image:alt" content={$page.route.id === '/info' || $page.route.id === '/clients' || $page.route.id === '/nostr-keys' || $page.route.id === '/pomegranate' || $page.route.id === '/relays' ? 'nostr information banner' : 'nostr social client feed preview'} />
+    <meta property="og:image:alt" content={routeId === '/info' || routeId === '/clients' || routeId === '/nostr-keys' || routeId === '/pomegranate' || routeId === '/relays' ? 'nostr information banner' : 'nostr social client feed preview'} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={seo.title} />
     <meta name="twitter:description" content={seo.description} />

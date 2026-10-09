@@ -22,7 +22,7 @@ export function readThreadSeed(id: string) {
 }
 
 export function savePrefetchedThreadReplies(rootId: string, replies: NostrEvent[]) {
-  if (!/^[0-9a-f]{64}$/i.test(rootId) || !replies.length) return;
+  if (!isValidThreadId(rootId) || !replies.length) return;
   const existing = prefetchedReplies.get(rootId) ?? [];
   const byId = new Map([...existing, ...replies].map((event) => [event.id, event]));
   prefetchedReplies.set(rootId, [...byId.values()].sort((a, b) => b.created_at - a.created_at).slice(0, 24));
@@ -39,7 +39,7 @@ export function readPrefetchedThreadReplies(rootId: string) {
 
 export function saveHydratedThread(rootId: string, events: NostrEvent[], hasOlderReplies: boolean) {
   restoreHydratedThreadsFromStorage();
-  if (!/^[0-9a-f]{64}$/i.test(rootId) || !events.length) return;
+  if (!isValidThreadId(rootId) || !events.length) return;
   const existing = hydratedThreads.get(rootId);
   const byId = new Map([...(existing?.events ?? []), ...events].map((event) => [event.id, event]));
   const root = byId.get(rootId);
@@ -92,7 +92,7 @@ function restoreHydratedThreadsFromStorage() {
     for (const item of parsed) {
       if (!Array.isArray(item) || item.length !== 2) continue;
       const [rootId, cached] = item as [unknown, unknown];
-      if (typeof rootId !== 'string' || !/^[0-9a-f]{64}$/i.test(rootId) || !isHydratedThreadCache(cached)) continue;
+      if (typeof rootId !== 'string' || !isValidThreadId(rootId) || !isHydratedThreadCache(cached)) continue;
       if (now - cached.savedAt > hydratedThreadTtlMs) continue;
       hydratedThreads.set(rootId, cached);
     }
@@ -100,6 +100,10 @@ function restoreHydratedThreadsFromStorage() {
   } catch {
     sessionStorage.removeItem(hydratedThreadStorageKey);
   }
+}
+
+function isValidThreadId(value: string) {
+  return /^[0-9a-f]{64}$/i.test(value) || /^\d+:[0-9a-f]{64}:.+$/i.test(value);
 }
 
 function isHydratedThreadCache(value: unknown): value is { events: NostrEvent[]; hasOlderReplies: boolean; savedAt: number } {

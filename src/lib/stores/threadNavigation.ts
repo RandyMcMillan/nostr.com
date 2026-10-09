@@ -6,7 +6,7 @@ const maxTargets = 80;
 let memoryTargets = new Map<string, string>();
 
 export function saveThreadReturnTarget(threadId: string, target: string) {
-  if (!/^[0-9a-f]{64}$/i.test(threadId) || !isLocalTarget(target)) return;
+  if (!isValidThreadId(threadId) || !isLocalTarget(target)) return;
   memoryTargets.set(threadId, target);
   while (memoryTargets.size > maxTargets) {
     const [oldestKey] = memoryTargets.keys();
@@ -29,6 +29,10 @@ function isLocalTarget(target: string) {
   return target.startsWith('/') && !target.startsWith('//');
 }
 
+function isValidThreadId(value: string) {
+  return /^[0-9a-f]{64}$/i.test(value) || /^\d+:[0-9a-f]{64}:.+$/i.test(value);
+}
+
 function persistThreadReturnTargets() {
   if (!browser) return;
   sessionStorage.setItem(storageKey, JSON.stringify([...memoryTargets.entries()]));
@@ -42,7 +46,7 @@ function loadThreadReturnTargets() {
     return new Map(
       parsed.filter(
         (entry): entry is [string, string] =>
-          Array.isArray(entry) && /^[0-9a-f]{64}$/i.test(entry[0]) && typeof entry[1] === 'string' && isLocalTarget(entry[1])
+          Array.isArray(entry) && isValidThreadId(entry[0]) && typeof entry[1] === 'string' && isLocalTarget(entry[1])
       )
     );
   } catch {

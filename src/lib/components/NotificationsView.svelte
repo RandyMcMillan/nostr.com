@@ -14,7 +14,7 @@
   }
 
   function iconFor(type: NotificationItem['type']) {
-    if (type === 'reply' || type === 'mention') return MessageCircle;
+    if (type === 'reply' || type === 'mention' || type === 'comment' || type === 'status') return MessageCircle;
     if (type === 'like') return Heart;
     if (type === 'repost') return Repeat2;
     return MessageCircle;
@@ -24,11 +24,16 @@
     if (item.type === 'reply') return 'replied to you';
     if (item.type === 'mention') return 'mentioned you';
     if (item.type === 'like') return 'liked your note';
-    return 'reposted your note';
+    if (item.type === 'repost') return 'reposted your note';
+    if (item.type === 'patch') return 'sent a patch';
+    if (item.type === 'pr') return 'opened a pull request';
+    if (item.type === 'issue') return 'opened an issue';
+    if (item.type === 'status') return 'updated status';
+    return 'commented';
   }
 
   function previewText(item: NotificationItem) {
-    const content = item.type === 'reply' || item.type === 'mention' ? item.event.content : item.targetEvent?.content || '';
+    const content = ['reply', 'mention', 'comment', 'status', 'patch', 'pr', 'issue'].includes(item.type) ? item.event.content : item.targetEvent?.content || '';
     const firstLine = content
       .split('\n')
       .map((line) => line.trim())
@@ -64,7 +69,12 @@
     if (item.type === 'reply') return 'New reply';
     if (item.type === 'mention') return 'Mention';
     if (item.type === 'like') return 'Like';
-    return 'Repost';
+    if (item.type === 'repost') return 'Repost';
+    if (item.type === 'patch') return 'Patch';
+    if (item.type === 'pr') return 'Pull request';
+    if (item.type === 'issue') return 'Issue';
+    if (item.type === 'status') return 'Status update';
+    return 'Comment';
   }
 
   function openNotification(item: NotificationItem) {

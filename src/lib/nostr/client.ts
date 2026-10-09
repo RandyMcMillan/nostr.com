@@ -6,6 +6,19 @@ import { cacheDeletedEventIds, cacheEvents, cacheProfile, cacheProfileEvents, ge
 import { adultDomains, adultHashtags, mutedWords, profanityTerms } from './contentFilters';
 import { defaultGuestNip05, defaultPomegranateCentral, defaultRelays, globalFeedHashtags } from './config';
 import { eventHasImgurUrl } from './media';
+import {
+  GIT_GRASP_LIST_KIND,
+  GIT_ISSUE_KIND,
+  GIT_PATCH_KIND,
+  GIT_PR_KIND,
+  GIT_REPO_KIND,
+  GIT_REPO_STATE_KIND,
+  GIT_ROOT_KINDS,
+  GIT_THREAD_REPLY_KINDS,
+  isAddressableKind,
+  isGitRootKind,
+  isGitStatusKind
+} from './kinds';
 import type { ContactListDetails, ContactListItem, CustomFeedSettings, DirectMessage, EventStats, FeedMode, FeedQueryOptions, Nip05Profile, NostrEvent, NotificationItem, Profile, RelayState, Session } from './types';
 
 export type RelayBackoffState = { failures: number; retryAt: number };
@@ -417,8 +430,10 @@ export function filterSpam(events: NostrEvent[], mutedPubkeys = new Set<string>(
     if (mutedPubkeys.has(event.pubkey)) return false;
     if (trustedPubkeys.has(event.pubkey)) return true;
     if (event.kind === 6) return Boolean(parseRepostContent(event));
+    const isGitRoot = isGitRootKind(event.kind);
+    const isGitReply = GIT_THREAD_REPLY_KINDS.includes(event.kind);
     if (event.kind === 1 && event.content.length > maxFeedPostContentLength) return false;
-    if (isMachineGeneratedContent(event.content)) return false;
+    if (!isGitRoot && !isGitReply && isMachineGeneratedContent(event.content)) return false;
     if (!isFamilySafeEvent(event)) return false;
     const lower = event.content.toLowerCase();
     if (options.blockProfanity && profanityTerms.some((word) => containsBlockedPhrase(lower, word))) return false;
@@ -427,7 +442,7 @@ export function filterSpam(events: NostrEvent[], mutedPubkeys = new Set<string>(
 }
 
 export function topLevelFeedEvents(events: NostrEvent[]) {
-  return events.filter((event) => event.kind === 1 && !isReplyEvent(event));
+  return events.filter((event) => (event.kind === 1 && !isReplyEvent(event)) || isGitRootKind(event.kind));
 }
 
 export function isReplyEvent(event: NostrEvent) {
@@ -700,7 +715,7 @@ export function feedSinceForQuery(mode: FeedMode, options: FeedQueryOptions = {}
 }
 
 export function feedKindsForMode(mode: FeedMode) {
-  return mode === 'follow' || mode === 'custom' ? [1, 6] : [1];
+  return mode === 'follow' || mode === 'custom' ? [1, 6, ...GIT_ROOT_KINDS] : [1];
 }
 
 export function feedRelayLimitForMode(mode: FeedMode, requestedLimit: number) {
@@ -746,10 +761,14 @@ export async function fetchDeletedEventIdsForEvents(events: NostrEvent[], relays
 
 async function fetchDeletedEventIds(events: NostrEvent[], relayUrls: string[]) {
   const ids = events.map((event) => event.id);
-  if (!ids.length) return new Set<string>();
-  const deletionRequests = verifiedRelayEvents(
-    await queryShortLived(relayUrls, { kinds: [5], '#e': ids, limit: Math.min(500, Math.max(40, ids.length * 4)) }, 3500)
-  );
+  const addressable = events.filter((event) => isAddressableKind(event.kind));
+  const addresses = addressable.map(addressableEventAddress).filter(Boolean);
+  if (!ids.length && !addresses.length) return new Set<string>();
+  const [eDeletions, aDeletions] = await Promise.all([
+    ids.length ? queryShortLived(relayUrls, { kinds: [5], '#e': ids, limit: Math.min(500, Math.max(40, ids.length * 4)) }, 3500) : Promise.resolve([]),
+    addresses.length ? queryShortLived(relayUrls, { kinds: [5], '#a': addresses, limit: Math.min(500, Math.max(40, addresses.length * 4)) }, 3500) : Promise.resolve([])
+  ]);
+  const deletionRequests = verifiedRelayEvents([...eDeletions, ...aDeletions]);
   const deleted = deletedEventIdsFromRequests(events, deletionRequests);
   if (deleted.size) void cacheDeletedEventIds([...deleted]);
   return deleted;
@@ -762,15 +781,27 @@ export function filterEventsDeletedByRequests(events: NostrEvent[], deletionRequ
 
 function deletedEventIdsFromRequests(events: NostrEvent[], deletionRequests: NostrEvent[]) {
   const byId = new Map(events.map((event) => [event.id, event]));
+  const byAddress = new Map(events.filter((event) => isAddressableKind(event.kind)).map((event) => [addressableEventAddress(event), event]));
   const deleted = new Set<string>();
   for (const request of deletionRequests) {
     for (const tag of request.tags) {
-      if (tag[0] !== 'e' || !tag[1]) continue;
-      const target = byId.get(tag[1]);
-      if (target && target.pubkey === request.pubkey) deleted.add(target.id);
+      if (!tag[1]) continue;
+      if (tag[0] === 'e') {
+        const target = byId.get(tag[1]);
+        if (target && target.pubkey === request.pubkey) deleted.add(target.id);
+      } else if (tag[0] === 'a') {
+        const target = byAddress.get(tag[1]);
+        if (target && target.pubkey === request.pubkey) deleted.add(target.id);
+      }
     }
   }
   return deleted;
+}
+
+function addressableEventAddress(event: NostrEvent) {
+  const identifier = event.tags.find((tag) => tag[0] === 'd' && tag[1])?.[1] ?? '';
+  if (!identifier) return '';
+  return `${event.kind}:${event.pubkey}:${identifier}`;
 }
 
 export async function subscribeFeed(
@@ -812,7 +843,7 @@ export async function subscribeEventStats(ids: string[], relays = defaultRelays,
   const relayUrls = activeRelayUrls(relays, 'read');
   if (!relayUrls.length) return undefined;
 
-  const filter: Filter = { kinds: [1, 5, 6, 7, 16, 9735], '#e': cleanIds, since: Math.floor(Date.now() / 1000) };
+  const filter: Filter = { kinds: [1, 5, 6, 7, 16, 9735, ...GIT_THREAD_REPLY_KINDS], '#e': cleanIds, since: Math.floor(Date.now() / 1000) };
   return pool.subscribeMany(relayUrls, filter, {
     label: 'visible-note-stats',
     onevent(event) {
@@ -846,11 +877,21 @@ export async function fetchMissingEvents(ids: string[], relays = defaultRelays, 
   return clean;
 }
 
+export async function fetchAddressableEvent(kind: number, pubkey: string, identifier: string, relays = defaultRelays, relayHints: string[] = []) {
+  const relayUrls = [...new Set([...relayHints.filter((url) => /^wss?:\/\//i.test(url)), ...activeRelayUrls(relays, 'read')])];
+  const events = verifiedRelayEvents(
+    await queryShortLived(relayUrls, { kinds: [kind], authors: [pubkey], '#d': [identifier], limit: 1 }, 5000, { retryEmpty: true })
+  );
+  const [latest] = events.sort((a, b) => b.created_at - a.created_at);
+  if (latest) await cacheEvents([latest]);
+  return latest;
+}
+
 export async function fetchThreadReplies(rootId: string | string[], relays = defaultRelays, limit = 80, options: Pick<FeedQueryOptions, 'until' | 'since'> = {}) {
   const ids = (Array.isArray(rootId) ? rootId : [rootId]).filter((id) => /^[0-9a-f]{64}$/i.test(id));
   if (!ids.length) return [];
   const relayUrls = activeRelayUrls(relays, 'read');
-  const filter: Filter = { kinds: [1], '#e': ids, limit };
+  const filter: Filter = { kinds: [1, ...GIT_THREAD_REPLY_KINDS], '#e': ids, limit };
   if (options.until) filter.until = options.until;
   if (options.since) filter.since = options.since;
   const events = verifiedRelayEvents(await queryShortLived(relayUrls, filter, 5000, { minEvents: Math.min(limit, 8), idleAfterMs: 650, retryEmpty: true }));
@@ -862,7 +903,7 @@ export async function fetchThreadReplies(rootId: string | string[], relays = def
 export async function fetchProfileEvents(pubkey: string, relays = defaultRelays, limit = 36, options: Pick<FeedQueryOptions, 'until' | 'since'> = {}) {
   if (!/^[0-9a-f]{64}$/i.test(pubkey)) return [];
   const relayUrls = activeRelayUrls(relays, 'read');
-  const filter: Filter = { kinds: [1, 6, 30023], authors: [pubkey], limit };
+  const filter: Filter = { kinds: [1, 6, 30023, ...GIT_ROOT_KINDS], authors: [pubkey], limit };
   if (options.until) filter.until = options.until;
   if (options.since) filter.since = options.since;
   const events = verifiedRelayEvents(await queryShortLived(relayUrls, filter, 5000, { minEvents: Math.min(limit, 8), idleAfterMs: 650, retryEmpty: true }));
@@ -1011,7 +1052,7 @@ export async function fetchEventStats(ids: string[], relays = defaultRelays) {
 
   const relayUrls = activeRelayUrls(relays, 'read');
   const filters: Filter[] = [
-    { kinds: [1], '#e': uniqueIds, limit: Math.min(500, uniqueIds.length * 20) },
+    { kinds: [1, ...GIT_THREAD_REPLY_KINDS], '#e': uniqueIds, limit: Math.min(500, uniqueIds.length * 20) },
     { kinds: [6, 16], '#e': uniqueIds, limit: Math.min(500, uniqueIds.length * 20) },
     { kinds: [7], '#e': uniqueIds, limit: Math.min(800, uniqueIds.length * 35) },
     { kinds: [9735], '#e': uniqueIds, limit: Math.min(500, uniqueIds.length * 20) }
@@ -1090,7 +1131,7 @@ export function eventStatsFromEvents(ids: string[], events: NostrEvent[]) {
   for (const event of events) {
     for (const id of statTargetIds(event, uniqueIds)) {
       if (!stats[id]) continue;
-      if (event.kind === 1 && !seen.replies.has(`${id}:${event.id}`)) {
+      if ((event.kind === 1 || GIT_THREAD_REPLY_KINDS.includes(event.kind)) && !seen.replies.has(`${id}:${event.id}`)) {
         seen.replies.add(`${id}:${event.id}`);
         stats[id].replies += 1;
       } else if ((event.kind === 6 || event.kind === 16) && !seen.reposts.has(`${id}:${event.pubkey}`)) {
@@ -1119,23 +1160,32 @@ export function eventStatsFromEvents(ids: string[], events: NostrEvent[]) {
 export async function fetchNotifications(pubkey: string, relays = defaultRelays, limit = 80) {
   if (!/^[0-9a-f]{64}$/i.test(pubkey)) return [];
   const relayUrls = activeRelayUrls(relays, 'read');
-  const ownPosts = filterSpam(verifiedRelayEvents(await queryShortLived(relayUrls, { kinds: [1], authors: [pubkey], limit: Math.min(240, limit * 3) }, 4500, { retryEmpty: true })));
+  const ownRoots = verifiedRelayEvents(
+    await queryShortLived(relayUrls, { kinds: [1, ...GIT_ROOT_KINDS], authors: [pubkey], limit: Math.min(240, limit * 3) }, 4500, { retryEmpty: true })
+  );
+  const ownPosts = filterSpam(ownRoots.filter((event) => event.kind === 1));
+  const ownGitRoots = ownRoots.filter((event) => isGitRootKind(event.kind));
   const ownPostIds = ownPosts.map((event) => event.id);
-  const ownPostById = new Map(ownPosts.map((event) => [event.id, event]));
+  const ownGitRootIds = ownGitRoots.map((event) => event.id);
+  const ownPostById = new Map([...ownPosts, ...ownGitRoots].map((event) => [event.id, event]));
 
   const filters: Filter[] = [
     { kinds: [1], '#p': [pubkey], limit },
     { kinds: [7], '#p': [pubkey], limit: Math.min(240, limit * 3) },
-    { kinds: [6, 16], '#p': [pubkey], limit: Math.min(180, limit * 2) }
+    { kinds: [6, 16], '#p': [pubkey], limit: Math.min(180, limit * 2) },
+    { kinds: [GIT_PATCH_KIND, GIT_PR_KIND, GIT_ISSUE_KIND], '#p': [pubkey], limit }
   ];
   if (ownPostIds.length) {
     filters.push({ kinds: [7], '#e': ownPostIds, limit: Math.min(240, ownPostIds.length * 12) });
     filters.push({ kinds: [6, 16], '#e': ownPostIds, limit: Math.min(180, ownPostIds.length * 8) });
   }
+  if (ownGitRootIds.length) {
+    filters.push({ kinds: GIT_THREAD_REPLY_KINDS, '#e': ownGitRootIds, limit: Math.min(240, ownGitRootIds.length * 12) });
+  }
 
   const events = dedupeEvents(verifiedRelayEvents((await Promise.all(filters.map((filter) => queryShortLived(relayUrls, filter, 5000, { retryEmpty: true })))).flat()));
   const notifications = events.flatMap((event) => notificationForEvent(event, pubkey, ownPostById));
-  await cacheEvents([...ownPosts, ...events.filter((event) => event.kind !== 3)]);
+  await cacheEvents([...ownPosts, ...ownGitRoots, ...events.filter((event) => event.kind !== 3)]);
   return dedupeNotifications(notifications).slice(0, limit);
 }
 
@@ -1145,17 +1195,26 @@ export async function subscribeNotifications(pubkey: string, relays = defaultRel
   if (!relayUrls.length) return undefined;
 
   const since = Math.floor(Date.now() / 1000) - 10;
-  const ownPosts = filterSpam(verifiedRelayEvents(await queryShortLived(relayUrls, { kinds: [1], authors: [pubkey], limit: Math.min(240, limit * 3) }, 4500, { retryEmpty: true })));
-  const ownPostById = new Map(ownPosts.map((event) => [event.id, event]));
+  const ownRoots = verifiedRelayEvents(
+    await queryShortLived(relayUrls, { kinds: [1, ...GIT_ROOT_KINDS], authors: [pubkey], limit: Math.min(240, limit * 3) }, 4500, { retryEmpty: true })
+  );
+  const ownPosts = filterSpam(ownRoots.filter((event) => event.kind === 1));
+  const ownGitRoots = ownRoots.filter((event) => isGitRootKind(event.kind));
+  const ownPostById = new Map([...ownPosts, ...ownGitRoots].map((event) => [event.id, event]));
+  const ownPostIds = ownPosts.map((event) => event.id);
+  const ownGitRootIds = ownGitRoots.map((event) => event.id);
   const filters: Filter[] = [
     { kinds: [1], '#p': [pubkey], since },
     { kinds: [7], '#p': [pubkey], since },
-    { kinds: [6, 16], '#p': [pubkey], since }
+    { kinds: [6, 16], '#p': [pubkey], since },
+    { kinds: [GIT_PATCH_KIND, GIT_PR_KIND, GIT_ISSUE_KIND], '#p': [pubkey], since }
   ];
-  const ownPostIds = ownPosts.map((event) => event.id);
   if (ownPostIds.length) {
     filters.push({ kinds: [7], '#e': ownPostIds, since });
     filters.push({ kinds: [6, 16], '#e': ownPostIds, since });
+  }
+  if (ownGitRootIds.length) {
+    filters.push({ kinds: GIT_THREAD_REPLY_KINDS, '#e': ownGitRootIds, since });
   }
 
   const requests = filters.flatMap((filter) => relayUrls.map((url) => ({ url, filter })));
@@ -1191,7 +1250,31 @@ export function notificationForEvent(event: NostrEvent, pubkey: string, ownPostB
     if (!targetId) return [];
     return [{ id: `repost:${targetId}:${event.pubkey}`, type: 'repost', actor: event.pubkey, event, targetId, targetEvent: ownPostById.get(targetId), seen: false }];
   }
+
+  const gitRootType = gitRootNotificationType(event.kind);
+  if (gitRootType && eventTagsPubkey(event, pubkey)) {
+    return [{ id: `${gitRootType}:${event.id}`, type: gitRootType, actor: event.pubkey, event, targetId: event.id, targetEvent: ownPostById.get(event.id), seen: false }];
+  }
+
+  if (GIT_THREAD_REPLY_KINDS.includes(event.kind)) {
+    const targetId = nip22RootTarget(event) || firstReferencedEventId(event) || event.id;
+    if (!ownPostById.has(targetId) && !eventTagsPubkey(event, pubkey)) return [];
+    const type = isGitStatusKind(event.kind) ? 'status' : 'comment';
+    return [{ id: `${type}:${event.id}`, type, actor: event.pubkey, event, targetId, targetEvent: ownPostById.get(targetId), seen: false }];
+  }
+
   return [];
+}
+
+function gitRootNotificationType(kind: number): NotificationItem['type'] | undefined {
+  if (kind === GIT_PATCH_KIND) return 'patch';
+  if (kind === GIT_PR_KIND) return 'pr';
+  if (kind === GIT_ISSUE_KIND) return 'issue';
+  return undefined;
+}
+
+function nip22RootTarget(event: NostrEvent) {
+  return event.tags.find((tag) => (tag[0] === 'E' || tag[0] === 'A') && tag[1])?.[1] ?? '';
 }
 
 function eventTagsPubkey(event: NostrEvent, pubkey: string) {
@@ -1323,7 +1406,9 @@ export async function publishReport(session: Session, target: NostrEvent, relays
 export async function publishDeletion(session: Session, target: NostrEvent, relays = defaultRelays, reason = 'Edited by author') {
   if (target.pubkey !== session.pubkey) throw new Error('You can only delete your own events.');
   const urls = deletionRelayUrls(target, relays);
-  const event = await signEventTemplate(session, { kind: 5, content: reason, tags: [['e', target.id], ['k', String(target.kind)]], created_at: now() });
+  const address = addressableEventAddress(target);
+  const tags = address ? [['a', address], ['k', String(target.kind)]] : [['e', target.id], ['k', String(target.kind)]];
+  const event = await signEventTemplate(session, { kind: 5, content: reason, tags, created_at: now() });
   await publishSignedEventToUrls(event, urls);
   return event as unknown as NostrEvent;
 }
@@ -1410,6 +1495,10 @@ export async function publishNote(session: Session, content: string, relays = de
 
 export async function signNote(session: Session, content: string, tags: string[][] = []) {
   return (await signEventTemplate(session, { kind: 1, content, tags, created_at: now() })) as unknown as NostrEvent;
+}
+
+export async function signEvent(session: Session, kind: number, content: string, tags: string[][] = []) {
+  return (await signEventTemplate(session, { kind, content, tags, created_at: now() })) as unknown as NostrEvent;
 }
 
 export async function publishSignedNostrEvent(event: NostrEvent, relays = defaultRelays) {
@@ -1842,7 +1931,7 @@ async function fetchCountStats(ids: string[], relayUrls: string[]) {
 
 async function countStatsForId(id: string, relayUrls: string[]): Promise<EventStats | undefined> {
   const [replies, reposts, likes, zaps] = await Promise.all([
-    relayCount(relayUrls, { kinds: [1], '#e': [id] }),
+    relayCount(relayUrls, { kinds: [1, ...GIT_THREAD_REPLY_KINDS], '#e': [id] }),
     relayCount(relayUrls, { kinds: [6, 16], '#e': [id] }),
     relayCount(relayUrls, { kinds: [7], '#e': [id] }),
     relayCount(relayUrls, { kinds: [9735], '#e': [id] })

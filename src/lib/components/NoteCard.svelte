@@ -8,6 +8,7 @@
   import { nip19 } from 'nostr-tools';
   import type { NostrEvent, Profile } from '$lib/nostr/types';
   import { extractMediaAttachments, extractQuotedNoteReferences, extractSocialEmbeds, isQuoteRepostEvent, parseNoteText } from '$lib/nostr/media';
+import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, isAddressableKind, isGitRootKind } from '$lib/nostr/kinds';
   import { activeRelayUrls, fetchLikeAuthors, fetchProfiles, subscribeZapReceipts } from '$lib/nostr/client';
   import { createZapInvoice, loadZapInfo, type ZapInfo } from '$lib/nostr/zap';
   import { deleteNote, displayEventForEvent, filterByHashtag, likedStateForEvent, mergeProfileRecords, muteAccount, prefetchThreadPreview, profiles, reactToNote, refreshEventStats, relays, reportNote, repostedStateForEvent, repostNote, session, startEdit, startQuote, startReply, statsForEvent, watchVisibleNoteStats } from '$lib/stores/app';
@@ -136,6 +137,13 @@
   $: quotedNoteRawValues = allQuotedNoteReferences.map((reference) => reference.raw);
   $: isLong = displayEvent.content.length > previewLength;
   $: visibleContent = !isLong || expanded ? renderedContent : renderedContent.slice(0, previewLength).trimEnd();
+  $: isGitRoot = isGitRootKind(displayEvent.kind);
+  $: isGitThreadReply = displayEvent.kind === COMMENT_KIND || GIT_STATUS_KINDS.includes(displayEvent.kind);
+  $: gitRepoName = displayEvent.tags.find((tag) => tag[0] === 'name')?.[1] ?? '';
+  $: gitDescription = displayEvent.tags.find((tag) => tag[0] === 'description')?.[1] ?? '';
+  $: gitCloneUrls = displayEvent.tags.filter((tag) => tag[0] === 'clone').map((tag) => tag[1]);
+  $: gitSubject = displayEvent.tags.find((tag) => tag[0] === 'subject')?.[1] ?? '';
+  $: gitRepoAddress = displayEvent.tags.find((tag) => tag[0] === 'a' && tag[1]?.startsWith('30617:'))?.[1] ?? '';
   $: contentParts = parseNoteText(visibleContent, [...mediaAttachments.map((media) => media.url), ...socialEmbeds.map((embed) => embed.url), ...quotedNoteRawValues], safeTags).slice(0, maxRenderedTextParts);
   $: counts = $statsStore;
   $: liked = $likedStore;
@@ -195,6 +203,11 @@
   }
 
   function threadRootId(note: NostrEvent) {
+    if (isGitRootKind(note.kind)) return note.id;
+    if (note.kind === COMMENT_KIND || GIT_STATUS_KINDS.includes(note.kind)) {
+      const rootTag = note.tags.find((tag) => (tag[0] === 'E' || tag[0] === 'A') && tag[1]);
+      if (rootTag?.[1]) return rootTag[1];
+    }
     if (note.kind !== 1) return note.id;
     const rootTag = note.tags.find((tag) => tag[0] === 'e' && tag[1] && tag[3] === 'root');
     if (rootTag?.[1]) return rootTag[1];
@@ -337,7 +350,7 @@
   }
 
   function isAddressableEvent(kind: number) {
-    return kind >= 30000 && kind < 40000;
+    return isAddressableKind(kind);
   }
 
   function shouldResetHiddenEmbed(provider: string) {
@@ -587,6 +600,20 @@
     </div>
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="note-content" class:collapsed={isLong && !expanded} role={embedded ? undefined : 'button'} tabindex={embedded ? undefined : 0} on:click={openFromNoteBody} on:keydown={openFromKeyboard}>
+      {#if isGitRoot}
+        <div class="git-preview">
+          {#if displayEvent.kind === 30617}
+            {#if gitRepoName}<strong class="git-title">{gitRepoName}</strong>{/if}
+            {#if gitDescription}<p class="git-description">{gitDescription}</p>{/if}
+            {#if gitCloneUrls.length}<p class="git-clone">{gitCloneUrls[0]}</p>{/if}
+          {:else if displayEvent.kind === 30618}
+            <strong class="git-title">Repository state</strong>
+          {:else}
+            {#if gitSubject}<strong class="git-title">{gitSubject}</strong>{/if}
+            {#if gitRepoAddress}<p class="git-repo">{gitRepoAddress}</p>{/if}
+          {/if}
+        </div>
+      {/if}
       {#each contentParts as part}
         {#if part.type === 'hashtag'}
           <button class="hashtag" on:click={() => filterHashtag(part.value)}>#{part.value}</button>
@@ -660,15 +687,17 @@
     {:else}
       <div class="note-actions">
         <button aria-label="Reply" on:click={() => startReply(displayEvent)}><MessageCircle size={18} /><span>{counts.replies}</span></button>
-        <span class="repost-action" bind:this={repostMenuElement}>
-          <button class:reposted={repostActionActive} aria-label={repostActionActive ? 'Repost options' : 'Repost'} aria-pressed={repostActionActive} aria-expanded={repostMenuOpen} on:click|stopPropagation={() => (repostMenuOpen = !repostMenuOpen)}><Repeat2 size={18} /><span>{counts.reposts}</span></button>
-          {#if repostMenuOpen}
-            <div class="repost-popover" role="menu">
-              <button type="button" role="menuitem" on:click|stopPropagation={quoteNoteAction}>Quote</button>
-              <button type="button" role="menuitem" on:click|stopPropagation={() => void repostNoteAction()}>{repostActionActive ? 'Undo repost' : 'Repost'}</button>
-            </div>
-          {/if}
-        </span>
+        {#if !isGitThreadReply}
+          <span class="repost-action" bind:this={repostMenuElement}>
+            <button class:reposted={repostActionActive} aria-label={repostActionActive ? 'Repost options' : 'Repost'} aria-pressed={repostActionActive} aria-expanded={repostMenuOpen} on:click|stopPropagation={() => (repostMenuOpen = !repostMenuOpen)}><Repeat2 size={18} /><span>{counts.reposts}</span></button>
+            {#if repostMenuOpen}
+              <div class="repost-popover" role="menu">
+                <button type="button" role="menuitem" on:click|stopPropagation={quoteNoteAction}>Quote</button>
+                <button type="button" role="menuitem" on:click|stopPropagation={() => void repostNoteAction()}>{repostActionActive ? 'Undo repost' : 'Repost'}</button>
+              </div>
+            {/if}
+          </span>
+        {/if}
         <span class="like-action">
           <button class:liked disabled={liking} aria-label={liked ? 'Unlike' : 'Like'} aria-pressed={liked} on:click={() => void likeNoteAction()}><Heart size={18} fill={liked ? 'currentColor' : 'none'} /></button>
           <button class="reaction-count" aria-label="Show likes" aria-expanded={likePopoverOpen} on:click={toggleLikePopover}>{counts.likes}</button>

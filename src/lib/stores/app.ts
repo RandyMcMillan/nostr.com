@@ -73,12 +73,14 @@ import {
   subscribeEventStats,
   subscribeFeed,
   subscribeNotifications,
+  signEvent,
   signNote,
   temporarilyUnavailableRelayUrls,
   topLevelFeedEvents
 } from '$lib/nostr/client';
 import { clearPomegranateAuth, importNsecIntoPomegranate, loginWithPomegranateProvider, type PomegranateLoginProvider } from '$lib/nostr/pomegranateAuth';
 import { eventHasImgurUrl } from '$lib/nostr/media';
+import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_THREAD_REPLY_KINDS, isAddressableKind, isGitRootKind, isGitStatusKind } from '$lib/nostr/kinds';
 import { clearNativePrivateKeySession, persistNativePrivateKeySession, readNativePrivateKeySession } from '$lib/nativeSecureSession';
 import { setupNativeLocalNotifications, showNativeNotificationForItem } from '$lib/nativeLocalNotifications';
 import { savePrefetchedThreadReplies } from '$lib/stores/threadSeed';
@@ -518,6 +520,7 @@ function displayFeedEvents(items: NostrEvent[]) {
 
 function feedDisplayEvent(event: NostrEvent) {
   if (event.kind === 1) return topLevelFeedEvents([event])[0];
+  if (isGitRootKind(event.kind)) return event;
   const reposted = parseRepostContent(event);
   return reposted ? topLevelFeedEvents([reposted])[0] : undefined;
 }
@@ -693,13 +696,33 @@ function mergeLiveStatEvent(ids: string[], event: NostrEvent) {
 }
 
 function applyDeletionRequest(event: NostrEvent) {
-  const deletedIds = event.tags
+  const eDeletedIds = event.tags
     .filter((tag) => tag[0] === 'e' && tag[1])
     .map((tag) => tag[1])
     .filter((id) => eventAuthorForLocalUse(id) === event.pubkey);
+  const aDeletedIds = event.tags
+    .filter((tag) => tag[0] === 'a' && tag[1])
+    .map((tag) => addressableEventIdForLocalUse(tag[1]))
+    .filter((id): id is string => Boolean(id) && eventAuthorForLocalUse(id) === event.pubkey);
+  const deletedIds = [...new Set([...eDeletedIds, ...aDeletedIds])];
   if (!deletedIds.length) return;
   void cacheDeletionRequest(event, deletedIds);
   applyDeletedEventIds(new Set(deletedIds), { cache: false });
+}
+
+function addressableEventIdForLocalUse(address: string) {
+  const match = address.match(/^(\d+):([0-9a-f]{64}):(.+)$/i);
+  if (!match) return '';
+  const kind = Number(match[1]);
+  const pubkey = match[2].toLowerCase();
+  const identifier = match[3];
+  const finder = (item: NostrEvent) => item.kind === kind && item.pubkey === pubkey && item.tags.some((tag) => tag[0] === 'd' && tag[1] === identifier);
+  return (
+    getStoreSnapshot(events).find(finder)?.id ??
+    getStoreSnapshot(pendingNewerEvents).find(finder)?.id ??
+    cachedOlderEvents.find(finder)?.id ??
+    ''
+  );
 }
 
 function applyDeletedEventIds(deleted: Set<string>, options: { cache?: boolean } = {}) {
@@ -1074,7 +1097,7 @@ async function hydrateCachedEventStats(ids: string[]) {
   if (!browser || !ids.length) return;
   const cachedSnapshots = await getCachedEventStats(ids);
   if (Object.keys(cachedSnapshots).length) eventStats.update((existing) => mergeStats(existing, cachedSnapshots));
-  cachedStatsEventsPromise ??= getCachedEvents(2000).then((events) => events.filter((event) => [1, 6, 7, 16, 9735].includes(event.kind)));
+  cachedStatsEventsPromise ??= getCachedEvents(2000).then((events) => events.filter((event) => [1, 6, 7, 16, 9735, ...GIT_THREAD_REPLY_KINDS].includes(event.kind)));
   const cachedEvents = await cachedStatsEventsPromise.catch(() => []);
   if (!cachedEvents.length) return;
   const cachedStats = eventStatsFromEvents(ids, cachedEvents);
@@ -1153,7 +1176,7 @@ function eventMatchesOwnAction(event: NostrEvent, action: CachedOwnAction) {
 }
 
 export function prefetchThreadPreview(event: NostrEvent) {
-  if (!browser || event.kind !== 1 || !/^[0-9a-f]{64}$/i.test(event.id)) return;
+  if (!browser || (!isGitRootKind(event.kind) && event.kind !== 1) || !/^[0-9a-f]{64}$/i.test(event.id)) return;
   const checkedAt = Date.now();
   if (checkedAt - (recentThreadPrefetches.get(event.id) ?? 0) < threadPrefetchCooldownMs) return;
   if (queuedThreadPrefetchIds.has(event.id)) return;
@@ -1539,8 +1562,9 @@ export async function postNote(content: string, parent?: NostrEvent, extraTags: 
   let currentSession: Session | null = null;
   session.subscribe((value) => (currentSession = value))();
   if (!currentSession) throw new Error('Sign in before posting.');
-  const tags = mergePublishTags(parent ? replyTags(parent) : [], extraTags);
-  const event = await signNote(currentSession, content, tags);
+  const kind = parent && (isGitRootKind(parent.kind) || GIT_THREAD_REPLY_KINDS.includes(parent.kind)) ? COMMENT_KIND : 1;
+  const tags = mergePublishTags(parent ? replyTags(parent, kind) : [], extraTags);
+  const event = kind === 1 ? await signNote(currentSession, content, tags) : await signEvent(currentSession, kind, content, tags);
   rememberLiveStatEvent(event.id);
   events.update((existing) => mergeEvents([event], existing));
   void cacheEvents([event]);
@@ -2646,7 +2670,7 @@ function mergeNotifications(next: NotificationItem[], existing: NotificationItem
 }
 
 function isActivityNotification(item: NotificationItem) {
-  return item.type === 'reply' || item.type === 'mention' || item.type === 'like' || item.type === 'repost';
+  return ['reply', 'mention', 'like', 'repost', 'patch', 'pr', 'issue', 'comment', 'status'].includes(item.type);
 }
 
 function notifyNativeForLiveNotifications(items: NotificationItem[]) {
@@ -2719,12 +2743,53 @@ function mergeLocalReplyStats(reply: NostrEvent) {
   });
 }
 
-function replyTags(parent: NostrEvent) {
+function replyTags(parent: NostrEvent, kind = 1) {
+  if (kind === COMMENT_KIND || isGitRootKind(parent.kind) || GIT_THREAD_REPLY_KINDS.includes(parent.kind)) {
+    return nip22ReplyTags(parent);
+  }
   const parentRoot = parent.tags.find((tag) => tag[0] === 'e' && tag[3] === 'root');
   const rootId = parentRoot?.[1] ?? parent.id;
   const pTags = new Set([parent.pubkey, ...parent.tags.filter((tag) => tag[0] === 'p' && tag[1]).map((tag) => tag[1])]);
   const tags = rootId === parent.id ? [['e', parent.id, '', 'root', parent.pubkey]] : [['e', rootId, '', 'root'], ['e', parent.id, '', 'reply', parent.pubkey]];
   return [...tags, ...[...pTags].map((pubkey) => ['p', pubkey])];
+}
+
+function nip22ReplyTags(parent: NostrEvent) {
+  const rootTag = parent.tags.find((tag) => (tag[0] === 'E' || tag[0] === 'A') && tag[1]);
+  const parentTag = parent.tags.find((tag) => (tag[0] === 'e' || tag[0] === 'a') && tag[1]);
+  const rootKind = Number(parent.tags.find((tag) => tag[0] === 'K')?.[1] ?? parent.kind);
+  const parentKind = Number(parent.tags.find((tag) => tag[0] === 'k')?.[1] ?? parent.kind);
+  const parentAddress = addressableEventAddress(parent);
+  const rootAddress = rootTag?.[1] ?? parentAddress ?? parent.id;
+  const replyAddress = parentTag?.[1] ?? parentAddress ?? parent.id;
+
+  const rootScopeTag = rootTag
+    ? [rootTag[0], rootAddress, ...(rootTag.slice(2).length ? rootTag.slice(2) : ['', parent.pubkey])]
+    : isAddressableKind(parent.kind)
+      ? ['A', rootAddress, '', parent.pubkey]
+      : ['E', parent.id, '', parent.pubkey];
+  const parentScopeTag = parentTag
+    ? [parentTag[0], replyAddress, ...(parentTag.slice(2).length ? parentTag.slice(2) : ['', parent.pubkey])]
+    : isAddressableKind(parent.kind)
+      ? ['a', replyAddress, '', parent.pubkey]
+      : ['e', parent.id, '', parent.pubkey];
+
+  const pTags = new Set([parent.pubkey, ...parent.tags.filter((tag) => tag[0] === 'p' && tag[1]).map((tag) => tag[1])]);
+  return [
+    rootScopeTag,
+    ['K', String(rootKind)],
+    ['P', parent.pubkey],
+    parentScopeTag,
+    ['k', String(parentKind)],
+    ['p', parent.pubkey],
+    ...[...pTags].map((pubkey) => ['p', pubkey])
+  ].filter((tag): tag is string[] => tag.every((item) => typeof item === 'string'));
+}
+
+function addressableEventAddress(event: NostrEvent) {
+  const identifier = event.tags.find((tag) => tag[0] === 'd' && tag[1])?.[1];
+  if (!identifier) return '';
+  return `${event.kind}:${event.pubkey}:${identifier}`;
 }
 
 function mergePublishTags(baseTags: string[][], extraTags: string[][]) {

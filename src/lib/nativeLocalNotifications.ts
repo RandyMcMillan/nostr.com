@@ -101,11 +101,16 @@ function notificationTitle(item: NotificationItem, profile?: Profile) {
   if (item.type === 'reply') return `${actor} replied to you`;
   if (item.type === 'mention') return `${actor} mentioned you`;
   if (item.type === 'like') return `${actor} liked your note`;
-  return `${actor} reposted your note`;
+  if (item.type === 'repost') return `${actor} reposted your note`;
+  if (item.type === 'patch') return `${actor} sent a patch`;
+  if (item.type === 'pr') return `${actor} opened a pull request`;
+  if (item.type === 'issue') return `${actor} opened an issue`;
+  if (item.type === 'status') return `${actor} updated status`;
+  return `${actor} commented`;
 }
 
 function notificationBody(item: NotificationItem) {
-  const content = item.type === 'reply' || item.type === 'mention' ? item.event.content : item.targetEvent?.content || '';
+  const content = ['reply', 'mention', 'comment', 'status', 'patch', 'pr', 'issue'].includes(item.type) ? item.event.content : item.targetEvent?.content || '';
   const firstLine = content
     .split('\n')
     .map((line) => line.trim())

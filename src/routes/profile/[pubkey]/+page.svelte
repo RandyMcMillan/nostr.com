@@ -11,6 +11,7 @@
   import { getCachedProfileEvents } from '$lib/nostr/cache';
   import { activeRelayUrls, dedupeEvents, fetchProfileEvents, fetchProfiles, isReplyEvent, topLevelFeedEvents } from '$lib/nostr/client';
   import { extractMediaAttachments } from '$lib/nostr/media';
+import { GIT_ROOT_KINDS, isGitRootKind } from '$lib/nostr/kinds';
   import { uploadToNostrBuild } from '$lib/nostr/upload';
   import { appPath } from '$lib/paths';
   import { readRouteScrollState, saveRouteScrollState } from '$lib/stores/routeScroll';
@@ -39,7 +40,7 @@
   const profilePreloadRootMargin = `0px 0px ${profilePreloadDistancePx}px 0px`;
   const profileRenderInitialLimit = 72;
   const profileRenderIncrement = 48;
-  type ProfileTab = 'notes' | 'replies' | 'reads' | 'media';
+  type ProfileTab = 'notes' | 'replies' | 'reads' | 'media' | 'git';
   type ProfileHydrateOptions = { reset?: boolean; useCache?: boolean };
   type ProfileTimelineItem = { id: string; event: NostrEvent };
 
@@ -389,7 +390,7 @@
         event.pubkey === targetPubkey &&
         !existingIds.has(event.id) &&
         eventInProfileWindow(event, profileRecentWindowLowerBound(), profileRecentWindowUpperBound()) &&
-        (event.kind === 1 || event.kind === 6 || event.kind === 30023)
+        (event.kind === 1 || event.kind === 6 || event.kind === 30023 || GIT_ROOT_KINDS.includes(event.kind))
     );
     if (!freshProfileEvents.length) return;
     addProfileEvents(freshProfileEvents);
@@ -401,18 +402,26 @@
   }
 
   function cleanProfileEvents(nextEvents: NostrEvent[]) {
-    return dedupeEvents(nextEvents).filter((event) => !$deletedEventIds.has(event.id) && (event.kind === 6 || (event.kind === 1 && topLevelFeedEvents([event]).length)));
+    return dedupeEvents(nextEvents).filter(
+      (event) =>
+        !$deletedEventIds.has(event.id) &&
+        (event.kind === 6 || (event.kind === 1 && topLevelFeedEvents([event]).length) || isGitRootKind(event.kind))
+    );
   }
 
   function cleanProfileSummaryEvents(nextEvents: NostrEvent[]) {
-    return dedupeEvents(nextEvents).filter((event) => !$deletedEventIds.has(event.id) && (event.kind === 1 || event.kind === 30023));
+    return dedupeEvents(nextEvents).filter((event) => !$deletedEventIds.has(event.id) && (event.kind === 1 || event.kind === 30023 || isGitRootKind(event.kind)));
   }
 
   function profileSummaryForEvents(nextEvents: NostrEvent[]) {
-    const summary = { notes: 0, replies: 0, reads: 0, media: 0 };
+    const summary = { notes: 0, replies: 0, reads: 0, media: 0, git: 0 };
     for (const event of nextEvents) {
       if (event.kind === 30023) {
         summary.reads += 1;
+        continue;
+      }
+      if (isGitRootKind(event.kind)) {
+        summary.git += 1;
         continue;
       }
       if (event.kind !== 1) continue;
@@ -433,6 +442,7 @@
     if (tab === 'replies') return event.kind === 1 && isReplyEvent(event);
     if (tab === 'reads') return event.kind === 30023;
     if (tab === 'media') return event.kind === 1 && extractMediaAttachments(event).length > 0;
+    if (tab === 'git') return isGitRootKind(event.kind);
     return event.kind === 1 && !isReplyEvent(event);
   }
 
@@ -447,6 +457,7 @@
     if (activeProfileTab === 'notes') return 'notes';
     if (activeProfileTab === 'replies') return 'replies';
     if (activeProfileTab === 'reads') return 'reads';
+    if (activeProfileTab === 'git') return 'git';
     return 'media posts';
   }
 
@@ -463,7 +474,7 @@
   }
 
   function nextProfilePaginationCursor(nextEvents: NostrEvent[], windowLower: number, limit: number) {
-    const cleanEvents = dedupeEvents(nextEvents).filter((event) => event.kind === 1 || event.kind === 6 || event.kind === 30023);
+    const cleanEvents = dedupeEvents(nextEvents).filter((event) => event.kind === 1 || event.kind === 6 || event.kind === 30023 || isGitRootKind(event.kind));
     if (cleanEvents.length >= limit) return Math.max(windowLower, Math.min(...cleanEvents.map((event) => event.created_at)));
     return windowLower;
   }
@@ -499,6 +510,7 @@
 
   function profileTimelineItem(event: NostrEvent): ProfileTimelineItem[] {
     if (event.kind === 1 && topLevelFeedEvents([event]).length) return [{ id: event.id, event }];
+    if (isGitRootKind(event.kind)) return [{ id: event.id, event }];
     const reposted = parseRepostContent(event);
     if (!reposted || !topLevelFeedEvents([reposted]).length) return [];
     return [{ id: event.id, event: reposted }];
@@ -692,6 +704,10 @@
       <button class:active={activeProfileTab === 'media'} role="tab" aria-selected={activeProfileTab === 'media'} on:click={() => selectProfileTab('media')}>
         <strong>{profileSummary.media}</strong>
         <span>media</span>
+      </button>
+      <button class:active={activeProfileTab === 'git'} role="tab" aria-selected={activeProfileTab === 'git'} on:click={() => selectProfileTab('git')}>
+        <strong>{profileSummary.git}</strong>
+        <span>git</span>
       </button>
     </div>
 

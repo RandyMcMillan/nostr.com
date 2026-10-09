@@ -7,9 +7,10 @@
   import NoteCard from '$lib/components/NoteCard.svelte';
   import { cacheEvents, getCachedThreadEvents } from '$lib/nostr/cache';
   import { deletedEventIds, eventStats, events, mergeEvents, mergeProfileRecords, prefetchThreadPreview, profiles, pruneDeletedEvents, refreshEventStats, relays } from '$lib/stores/app';
-  import { eventStatsFromEvents, fetchMissingEvents, fetchProfiles, fetchThreadReplies, subscribeEventStats } from '$lib/nostr/client';
+  import { eventStatsFromEvents, fetchAddressableEvent, fetchMissingEvents, fetchProfiles, fetchThreadReplies, subscribeEventStats } from '$lib/nostr/client';
   import { eventPointerFromIdentifier } from '$lib/nostr/identifiers';
   import { appPath } from '$lib/paths';
+import { COMMENT_KIND, GIT_ROOT_KINDS, GIT_STATUS_KINDS, GIT_THREAD_REPLY_KINDS, isAddressableKind, isGitRootKind } from '$lib/nostr/kinds';
   import { readRouteScrollState, saveRouteScrollState } from '$lib/stores/routeScroll';
   import { currentThreadReturnTarget, readThreadReturnTarget, saveThreadReturnTarget } from '$lib/stores/threadNavigation';
   import { readHydratedThread, readPrefetchedThreadReplies, readThreadSeed, saveHydratedThread, saveThreadSeed } from '$lib/stores/threadSeed';
@@ -111,7 +112,12 @@
   }
 
   function threadReplyEvents(items: NostrEvent[], rootId: string) {
-    const candidates = items.filter((event) => event.id !== rootId && event.kind === 1 && event.tags.some((tag) => tag[0] === 'e' && tag[1]));
+    const candidates = items.filter(
+      (event) =>
+        event.id !== rootId &&
+        (event.kind === 1 || GIT_THREAD_REPLY_KINDS.includes(event.kind)) &&
+        event.tags.some((tag) => (tag[0] === 'e' || tag[0] === 'E' || tag[0] === 'a' || tag[0] === 'A') && tag[1])
+    );
     const included = new Set<string>();
     let changed = true;
     while (changed) {
@@ -129,11 +135,11 @@
   }
 
   function replyParentId(event: NostrEvent, rootId: string) {
-    const replyTag = [...event.tags].reverse().find((tag) => tag[0] === 'e' && tag[1] && tag[3] === 'reply');
+    const replyTag = [...event.tags].reverse().find((tag) => (tag[0] === 'e' || tag[0] === 'a') && tag[1] && tag[3] === 'reply');
     if (replyTag?.[1]) return replyTag[1];
-    const eTags = event.tags.filter((tag) => tag[0] === 'e' && tag[1]);
-    const nonRoot = [...eTags].reverse().find((tag) => tag[1] !== rootId);
-    return nonRoot?.[1] ?? (eTags.some((tag) => tag[1] === rootId) ? rootId : '');
+    const refTags = event.tags.filter((tag) => (tag[0] === 'e' || tag[0] === 'a') && tag[1]);
+    const nonRoot = [...refTags].reverse().find((tag) => tag[1] !== rootId);
+    return nonRoot?.[1] ?? (refTags.some((tag) => tag[1] === rootId) ? rootId : '');
   }
 
   function threadReplyTreeItems(items: NostrEvent[], rootId: string) {
@@ -187,11 +193,20 @@
       const focusedContextPromise = hydrateFocusedReplyContext(rootId, runId);
       const earlyReplyBatchPromise = initialThreadReplyBatch(restored, rootEvent);
 
-      const cached = rootEvent?.id === rootId ? rootEvent : $events.find((event) => event.id === rootId);
-      const [found] = cached ? [cached] : await fetchMissingEvents([rootId], $relays, pointer?.relays ?? []).catch(() => []);
+      const addressable = parseAddressableId(rootId);
+      const cached = rootEvent?.id === rootId
+        ? rootEvent
+        : addressable
+          ? undefined
+          : $events.find((event) => event.id === rootId);
+      const found = cached
+        ? cached
+        : addressable
+          ? await fetchAddressableEvent(addressable.kind, addressable.pubkey, addressable.identifier, $relays, pointer?.relays ?? []).catch(() => undefined)
+          : (await fetchMissingEvents([rootId], $relays, pointer?.relays ?? []).catch(() => []))[0];
       if (!isCurrentHydration(rootId, runId)) return;
       if (found) {
-        const canonicalRootId = threadRootId(found);
+        const canonicalRootId = addressable ? rootId : threadRootId(found);
         if (canonicalRootId && canonicalRootId !== rootId) {
           const existingReturnTarget = readThreadReturnTarget(canonicalRootId) || readThreadReturnTarget(rootId);
           saveThreadSeed(found);
@@ -526,6 +541,11 @@
   }
 
   function threadRootId(note: NostrEvent) {
+    if (isGitRootKind(note.kind)) return note.id;
+    if (note.kind === COMMENT_KIND || GIT_STATUS_KINDS.includes(note.kind)) {
+      const rootTag = note.tags.find((tag) => (tag[0] === 'E' || tag[0] === 'A') && tag[1]);
+      if (rootTag?.[1]) return rootTag[1];
+    }
     if (note.kind !== 1) return note.id;
     const rootTag = note.tags.find((tag) => tag[0] === 'e' && tag[1] && tag[3] === 'root');
     if (rootTag?.[1]) return rootTag[1];
@@ -535,6 +555,18 @@
 
   function threadEventsForCache() {
     return mergeThreadEvents(rootEvent ? [rootEvent, ...localThreadEvents] : localThreadEvents, []);
+  }
+
+  function addressableEventAddress(event: NostrEvent) {
+    const identifier = event.tags.find((tag) => tag[0] === 'd' && tag[1])?.[1];
+    if (!identifier) return '';
+    return `${event.kind}:${event.pubkey}:${identifier}`;
+  }
+
+  function parseAddressableId(value: string) {
+    const match = value.match(/^(\d+):([0-9a-f]{64}):(.+)$/i);
+    if (!match) return null;
+    return { kind: Number(match[1]), pubkey: match[2].toLowerCase(), identifier: match[3] };
   }
 
   function saveThreadStateToReturnChain(currentRootId: string, threadItems: NostrEvent[]) {
@@ -656,7 +688,7 @@
     void cacheEvents([event]);
     mergeLiveThreadStats(statIds, event);
 
-    if (event.kind !== 1) return;
+    if (event.kind !== 1 && !GIT_THREAD_REPLY_KINDS.includes(event.kind)) return;
     const candidateThread = mergeThreadEvents([event], threadEventsForCache());
     if (!threadReplyEvents(candidateThread, rootId).some((reply) => reply.id === event.id)) return;
 
@@ -691,12 +723,17 @@
 
   function applyLiveThreadDeletion(event: NostrEvent) {
     const byId = new Map(threadEventsForCache().map((item) => [item.id, item]));
-    const deleted = new Set(
-      event.tags
-        .filter((tag) => tag[0] === 'e' && tag[1])
-        .map((tag) => tag[1])
-        .filter((targetId) => byId.get(targetId)?.pubkey === event.pubkey)
+    const byAddress = new Map(
+      threadEventsForCache()
+        .filter((item) => isAddressableKind(item.kind))
+        .map((item) => [addressableEventAddress(item), item])
     );
+    const deleted = new Set<string>();
+    for (const tag of event.tags) {
+      if (!tag[1]) continue;
+      const target = tag[0] === 'e' ? byId.get(tag[1]) : tag[0] === 'a' ? byAddress.get(tag[1]) : undefined;
+      if (target && target.pubkey === event.pubkey) deleted.add(target.id);
+    }
     if (!deleted.size) return;
     deletedEventIds.update((existing) => new Set([...existing, ...deleted]));
     localThreadEvents = localThreadEvents.filter((item) => !deleted.has(item.id));

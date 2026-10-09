@@ -5,6 +5,7 @@ export interface EventPointer {
   relays: string[];
   author?: string;
   kind?: number;
+  identifier?: string;
 }
 
 export interface ProfilePointer {
@@ -25,6 +26,16 @@ export function eventPointerFromIdentifier(value: string): EventPointer | null {
         relays: decoded.data.relays ?? [],
         author: decoded.data.author,
         kind: decoded.data.kind
+      };
+    }
+    if (decoded.type === 'naddr') {
+      const address = `${decoded.data.kind}:${decoded.data.pubkey}:${decoded.data.identifier}`;
+      return {
+        id: address,
+        relays: decoded.data.relays ?? [],
+        author: decoded.data.pubkey,
+        kind: decoded.data.kind,
+        identifier: decoded.data.identifier
       };
     }
   } catch {
