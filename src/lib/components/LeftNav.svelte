@@ -50,7 +50,6 @@
         on:click={item.href === '/' ? goHome : item.href === '/notifications' ? markNotificationsSeen : item.href === '/messages' ? () => { markMessagesSeen(); selectMessagePeer(''); } : undefined}
       >
         <svelte:component this={item.icon} size={26} />
-        <span>{item.label}</span>
         {#if badge}
           <span class="nav-row-badge">{badge}</span>
         {/if}
@@ -58,19 +57,15 @@
     {/each}
     <a class:active={$page.route.id?.startsWith('/profile/')} href={appPath(profileHref)}>
       <UserRound size={26} />
-      <span>Profile</span>
     </a>
     <a class:active={isActive('/settings')} href={appPath('/settings')}>
       <Settings size={26} />
-      <span>Settings</span>
     </a>
     <a class:active={isActive('/info')} href={appPath('/info')}>
       <MoreHorizontal size={26} />
-      <span>info</span>
     </a>
     <button class="nav-compose" on:click={startCompose}>
       <PencilLine size={26} />
-      <span>Note</span>
     </button>
   </nav>
 </aside>
