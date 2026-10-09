@@ -153,7 +153,7 @@ label span, label strong { color: var(--text); }
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 16px;
-  padding: 14px 18px 18px;
+  padding: 14px 32px 32px;
 }
 /* add gnostr.svg here */
 .left-logo {
@@ -189,22 +189,23 @@ label span, label strong { color: var(--text); }
 .left-nav-list {
   display: grid;
   align-content: start;
-  gap: 6px;
+  gap: 0px;
 }
 .left-nav-list a,
 .left-nav-list button {
-  min-height: 48px;
-  width: fit-content;
+  height: 64px;
+  width: 64px;
   display: inline-flex;
   align-items: center;
-  gap: 18px;
   border: 0;
-  border-radius: 999px;
-  padding: 0 18px;
+  border-radius: 0px;
+  padding: 0px 0px 0px 18px;
+    /*
   color: var(--text);
   background: transparent;
   font-size: 19px;
   font-weight: 650;
+  */
 }
 .left-nav-list a.active,
 .left-nav-list a:hover,
@@ -212,14 +213,18 @@ label span, label strong { color: var(--text); }
   background: color-mix(in srgb, var(--text) 9%, transparent);
 }
 .left-nav-list .nav-compose {
-  margin-top: 14px;
-  margin-left: 5px;
-  width: 35%;
-  min-height: 52px;
+  /* move compose button up/down */
+  margin-top: 32px;
+  /* move compose button left/right */
+  margin-left: 0px;
+  /* align icon in box left/right*/
+  padding-right: 15px;
+  width: 64px;
+  min-height: 64px;
   justify-content: center;
   border: 1px solid var(--text);
   background: var(--text);
-  color: var(--bg);
+  color: var(--bg); /* icon color */
   font-size: 17px;
   font-weight: 850;
 }
