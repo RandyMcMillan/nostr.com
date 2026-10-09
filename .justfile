@@ -1,5 +1,9 @@
 # Nostr Social — common development commands
 
+# Default recipe: type-check and test
+@default:
+    just check-test
+
 # Run the Svelte dev server
 @dev:
     npm run dev
