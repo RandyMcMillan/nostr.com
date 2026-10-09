@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('nostrGit', {
   status: (payload) => ipcRenderer.invoke('nostr-git:status', payload),
   log: (payload) => ipcRenderer.invoke('nostr-git:log', payload),
   remotes: (payload) => ipcRenderer.invoke('nostr-git:remotes', payload),
+  fetch: (payload) => ipcRenderer.invoke('nostr-git:fetch', payload),
+  pull: (payload) => ipcRenderer.invoke('nostr-git:pull', payload),
   clone: (payload) => ipcRenderer.invoke('nostr-git:clone', payload),
   init: (payload) => ipcRenderer.invoke('nostr-git:init', payload),
   remove: (payload) => ipcRenderer.invoke('nostr-git:remove', payload),

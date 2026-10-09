@@ -8,6 +8,8 @@
     getRepoStatus,
     openRepoFolder,
     removeRepoEntry,
+    fetchRepo,
+    pullRepo,
     type GitRepoEntry,
     type GitStatus
   } from '$lib/nativeGit';
@@ -64,6 +66,26 @@
     }
   }
 
+  async function fetch(repo: GitRepoEntry) {
+    error = '';
+    const result = await fetchRepo(repo.localPath);
+    if (!result.ok) {
+      error = result.error || 'Fetch failed.';
+    } else {
+      await loadRepos();
+    }
+  }
+
+  async function pull(repo: GitRepoEntry) {
+    error = '';
+    const result = await pullRepo(repo.localPath, { ffOnly: true });
+    if (!result.ok) {
+      error = result.error || 'Pull failed.';
+    } else {
+      await loadRepos();
+    }
+  }
+
   function repoName(repo: GitRepoEntry): string {
     const identifier = repo.address.split(':').slice(2).join(':') || 'repo';
     return identifier;
@@ -116,6 +138,8 @@
               <span class="repo-status"><GitBranch size={13} /> {statusLabel(repo)}</span>
             </div>
             <div class="repo-actions">
+              <button class="icon-button" title="Fetch" on:click={() => fetch(repo)}><RefreshCw size={16} /></button>
+              <button class="icon-button" title="Pull" on:click={() => pull(repo)}><GitBranch size={16} /></button>
               <button class="icon-button" title="Open folder" on:click={() => openFolder(repo)}><FolderOpen size={16} /></button>
               <button class="icon-button danger-icon" title="Forget" on:click={() => forget(repo)}><Trash2 size={16} /></button>
             </div>

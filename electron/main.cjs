@@ -10,6 +10,8 @@ const {
   getRepositoryLog,
   getRemotes,
   initRepository,
+  fetchRepository,
+  pullRepository,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -372,6 +374,28 @@ function registerNostrGitHandlers() {
       return { ok: true, remotes };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not read remotes.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:fetch', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await fetchRepository(localPath, payload?.remote, payload?.prune !== false);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Fetch failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:pull', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await pullRepository(localPath, { ffOnly: payload?.ffOnly, rebase: payload?.rebase });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Pull failed.' };
     }
   });
 

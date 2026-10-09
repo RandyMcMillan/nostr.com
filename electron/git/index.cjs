@@ -5,6 +5,8 @@ const { getRepositoryStatus } = require('./status.cjs');
 const { getRepositoryLog } = require('./log.cjs');
 const { getRemotes, addRemote } = require('./remote.cjs');
 const { initRepository } = require('./init.cjs');
+const { fetchRepository } = require('./fetch.cjs');
+const { pullRepository } = require('./pull.cjs');
 const store = require('./store.cjs');
 
 module.exports = {
@@ -17,5 +19,7 @@ module.exports = {
   getRemotes,
   addRemote,
   initRepository,
+  fetchRepository,
+  pullRepository,
   store
 };
