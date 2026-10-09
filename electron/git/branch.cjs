@@ -18,7 +18,7 @@ async function getBranches(repoPath) {
 async function checkoutBranch(repoPath, branchName, create = false) {
   const args = ['checkout'];
   if (create) args.push('-b');
-  args.push('--', branchName);
+  args.push(branchName);
   await runGit(args, repoPath);
 }
 

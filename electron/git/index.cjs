@@ -8,6 +8,7 @@ const { initRepository } = require('./init.cjs');
 const { fetchRepository } = require('./fetch.cjs');
 const { pullRepository } = require('./pull.cjs');
 const { getBranches, checkoutBranch } = require('./branch.cjs');
+const { commit } = require('./commit.cjs');
 const store = require('./store.cjs');
 
 module.exports = {
@@ -24,5 +25,6 @@ module.exports = {
   pullRepository,
   getBranches,
   checkoutBranch,
+  commit,
   store
 };
