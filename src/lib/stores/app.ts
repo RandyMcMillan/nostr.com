@@ -1574,6 +1574,39 @@ export async function postNote(content: string, parent?: NostrEvent, extraTags: 
   quoteTarget.set(null);
 }
 
+export interface GitRepoAnnouncement {
+  name: string;
+  identifier: string;
+  description?: string;
+  cloneUrls: string[];
+  defaultBranch?: string;
+  webUrl?: string;
+}
+
+export async function publishGitRepo(announcement: GitRepoAnnouncement) {
+  let currentSession: Session | null = null;
+  session.subscribe((value) => (currentSession = value))();
+  if (!currentSession) throw new Error('Sign in before publishing.');
+
+  const { GIT_REPO_KIND } = await import('$lib/nostr/kinds');
+  const tags: string[][] = [
+    ['d', announcement.identifier],
+    ['name', announcement.name]
+  ];
+  if (announcement.description) tags.push(['description', announcement.description]);
+  if (announcement.defaultBranch) tags.push(['default_branch', announcement.defaultBranch]);
+  if (announcement.webUrl) tags.push(['web', announcement.webUrl]);
+  for (const url of announcement.cloneUrls) {
+    if (url) tags.push(['clone', url]);
+  }
+
+  const event = await signEvent(currentSession, GIT_REPO_KIND, '', tags);
+  events.update((existing) => mergeEvents([event], existing));
+  void cacheEvents([event]);
+  enqueuePublish(event);
+  return event;
+}
+
 function enqueuePublish(event: NostrEvent) {
   if (pendingPublishEvents.has(event.id)) return;
   pendingPublishEvents.set(event.id, { event, attempts: 0, nextAttemptAt: Date.now() });
