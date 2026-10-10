@@ -46,6 +46,7 @@ The following operations have been wired behind the `window.nostrGit` bridge and
 - ✅ `remote` add/list/remove
 - ✅ `stash` create/pop/drop/list
 - ✅ `submodule` update / list
+- ✅ `worktree` add / list / remove
 
 Still to port:
 
