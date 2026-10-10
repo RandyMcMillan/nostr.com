@@ -18,6 +18,8 @@
     createRepoTag,
     deleteRepoTag,
     resetRepo,
+    fetchRepo,
+    pullRepo,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
@@ -378,6 +380,44 @@
     }
   }
 
+  async function fetch() {
+    if (!entry?.localPath) return;
+    busy = true;
+    error = '';
+    try {
+      const result = await fetchRepo(entry.localPath);
+      busy = false;
+      if (result.ok) {
+        message = 'Fetched';
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Fetch failed.';
+      }
+    } catch (err) {
+      busy = false;
+      error = err instanceof Error ? err.message : 'Fetch failed.';
+    }
+  }
+
+  async function pull() {
+    if (!entry?.localPath) return;
+    busy = true;
+    error = '';
+    try {
+      const result = await pullRepo(entry.localPath);
+      busy = false;
+      if (result.ok) {
+        message = 'Pulled';
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Pull failed.';
+      }
+    } catch (err) {
+      busy = false;
+      error = err instanceof Error ? err.message : 'Pull failed.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -436,6 +476,8 @@
         <button class="git-button" on:click={toggleExpanded} disabled={busy}>
           <GitCommit size={14} /> {expanded ? 'Hide' : 'Details'}
         </button>
+        <button class="git-button" on:click={fetch} disabled={busy}>Fetch</button>
+        <button class="git-button" on:click={pull} disabled={busy}>Pull</button>
         <button class="git-button" on:click={openPr} disabled={busy}><GitPullRequest size={14} /> New PR</button>
         {#if existingPrs.length}
           <button class="git-button" on:click={() => (prUpdateOpen = true)} disabled={busy}><GitPullRequest size={14} /> Update PR</button>
