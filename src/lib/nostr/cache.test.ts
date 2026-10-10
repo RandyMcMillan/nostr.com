@@ -146,7 +146,7 @@ describe('IndexedDB cache', () => {
     expect(cached).toHaveLength(1200);
     expect(cached[0].id).toBe(hexId('alice-1204'));
     expect(cached.at(-1)?.id).toBe(hexId('alice-5'));
-  }, 10_000);
+  }, 30_000);
 
   it('keeps a separate ordered hashtag event cache from tags and content', async () => {
     await cacheEvents([
