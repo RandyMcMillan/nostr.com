@@ -13,6 +13,8 @@ import {
   GIT_PATCH_KIND,
   GIT_PR_KIND,
   GIT_ISSUE_KIND,
+  NIP34_PATCH_KIND,
+  NIP34_ISSUE_KIND,
   GIT_ROOT_KINDS,
   GIT_STATUS_OPEN_KIND,
   GIT_STATUS_APPLIED_KIND,
@@ -141,7 +143,7 @@ import {
   $: name = profile?.display_name || profile?.name || displayEvent.pubkey.slice(0, 10);
   $: avatar = profile?.picture;
   $: safeTags = displayEvent.tags.slice(0, maxRenderableTags);
-  $: isGitPatch = displayEvent.kind === GIT_PATCH_KIND;
+  $: isGitPatch = displayEvent.kind === GIT_PATCH_KIND || displayEvent.kind === NIP34_PATCH_KIND;
   $: displayContent = isGitPatch ? '(patch contents)' : displayEvent.content;
   $: parsedContent = displayContent.slice(0, maxParsedContentLength);
   $: renderedContent = displayContent.slice(0, maxExpandedContentLength);
@@ -175,7 +177,7 @@ import {
   $: reposted = $repostedStore;
   $: isOwnPost = $session?.pubkey === event.pubkey;
   $: ownQuoteRepost = isOwnPost && isQuoteRepostEvent(displayEvent);
-  $: gitStatusRepoAddress = [GIT_PATCH_KIND, GIT_PR_KIND, GIT_ISSUE_KIND].includes(displayEvent.kind)
+  $: gitStatusRepoAddress = [GIT_PATCH_KIND, GIT_PR_KIND, GIT_ISSUE_KIND, NIP34_PATCH_KIND, NIP34_ISSUE_KIND].includes(displayEvent.kind)
     ? displayEvent.tags.find((tag) => tag[0] === 'a' && tag[1]?.startsWith('30617:'))?.[1] ?? ''
     : '';
   $: gitStatusRepoOwner = gitStatusRepoAddress ? gitStatusRepoAddress.split(':')[1] : '';
@@ -698,7 +700,7 @@ import {
                 {/each}
               </ul>
             {/if}
-          {:else if displayEvent.kind === GIT_PATCH_KIND}
+          {:else if isGitPatch}
             <strong class="git-title">Patch</strong>
             {#if gitRepoAddress}<p class="git-repo">{gitRepoAddress}</p>{/if}
           {:else}
