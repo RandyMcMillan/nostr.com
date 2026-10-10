@@ -76,3 +76,21 @@ act-ci-verbose:
 
 # Run the full local validation that CI runs
 ci: check test
+
+# --- Desktop integration recipes ---
+
+# Initialize the desktop submodule (only needed once after clone)
+desktop-submodule-init:
+    git submodule update --init --recursive vendor/desktop
+
+# Update the desktop submodule to the latest commit on its tracked branch
+desktop-submodule-update:
+    git submodule update --remote vendor/desktop
+
+# Build the desktop Electron app from the submodule (useful for reference builds)
+desktop-build:
+    cd vendor/desktop && yarn build:prod
+
+# Show the desktop integration plan
+show-desktop-plan:
+    @cat docs/desktop-integration-plan.md
