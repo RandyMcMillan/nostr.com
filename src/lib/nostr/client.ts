@@ -1505,6 +1505,10 @@ export async function publishSignedNostrEvent(event: NostrEvent, relays = defaul
   await publishSignedEvent(event as NostrToolsEvent, relays);
 }
 
+export async function publishSignedNostrEventToUrls(event: NostrEvent, urls: string[]) {
+  await publishSignedEventToUrls(event as NostrToolsEvent, urls, 'No relays are available for publishing.');
+}
+
 export async function publishProfile(session: Session, profile: Profile, relays = defaultRelays) {
   const metadata = compactProfile(profile);
   const event = await publishEventTemplate(session, { kind: 0, content: JSON.stringify(metadata), tags: [], created_at: now() }, relays);

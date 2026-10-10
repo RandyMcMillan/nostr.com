@@ -64,6 +64,7 @@ import {
   publishReport,
   publishRepost,
   publishSignedNostrEvent,
+  publishSignedNostrEventToUrls,
   publishNip17DirectMessage,
   parseRepostContent,
   resetRelayBackoff,
@@ -263,7 +264,7 @@ const requestedStats = new Map<string, number>();
 const statsRetryMs = 60_000;
 const pendingLikeToggles = new Set<string>();
 const pendingRepostToggles = new Set<string>();
-const pendingPublishEvents = new Map<string, { event: NostrEvent; attempts: number; nextAttemptAt: number }>();
+const pendingPublishEvents = new Map<string, { event: NostrEvent; attempts: number; nextAttemptAt: number; extraRelays: string[] }>();
 const ownLikeEvents = new Map<string, NostrEvent>();
 const ownRepostEvents = new Map<string, NostrEvent>();
 const queuedThreadPrefetches: NostrEvent[] = [];
@@ -1714,7 +1715,7 @@ export async function publishGitIssue(input: GitIssueInput) {
   const event = await signEvent(currentSession, GIT_ISSUE_KIND, input.content, tags);
   events.update((existing) => mergeEvents([event], existing));
   void cacheEvents([event]);
-  enqueuePublish(event);
+  enqueuePublish(event, input.repoRelays);
   return event;
 }
 
@@ -1743,7 +1744,7 @@ export async function publishGitPullRequest(input: GitPullRequestInput) {
   const event = await signEvent(currentSession, GIT_PR_KIND, input.content, tags);
   events.update((existing) => mergeEvents([event], existing));
   void cacheEvents([event]);
-  enqueuePublish(event);
+  enqueuePublish(event, input.repoRelays);
   return event;
 }
 
@@ -1766,7 +1767,7 @@ export async function publishGitPatch(input: GitPatchInput) {
   const event = await signEvent(currentSession, GIT_PATCH_KIND, input.patch, tags);
   events.update((existing) => mergeEvents([event], existing));
   void cacheEvents([event]);
-  enqueuePublish(event);
+  enqueuePublish(event, input.repoRelays);
   return event;
 }
 
@@ -1793,13 +1794,14 @@ export async function publishGitStatus(rootEvent: NostrEvent, statusKind: number
   const event = await signEvent(currentSession, statusKind, note, tags);
   events.update((existing) => mergeEvents([event], existing));
   void cacheEvents([event]);
-  enqueuePublish(event);
+  enqueuePublish(event, repoAddressTag[2] ? [repoAddressTag[2]] : undefined);
   return event;
 }
 
-function enqueuePublish(event: NostrEvent) {
+function enqueuePublish(event: NostrEvent, extraRelays: string[] = []) {
   if (pendingPublishEvents.has(event.id)) return;
-  pendingPublishEvents.set(event.id, { event, attempts: 0, nextAttemptAt: Date.now() });
+  const normalized = [...new Set(extraRelays.map(normalizeRelayUrl).filter(Boolean))];
+  pendingPublishEvents.set(event.id, { event, attempts: 0, nextAttemptAt: Date.now(), extraRelays: normalized });
   prunePendingPublishes();
   persistPendingPublishes();
   drainPublishQueue();
@@ -1826,7 +1828,9 @@ async function publishQueuedEvents() {
   const ready = [...pendingPublishEvents.values()].filter((item) => item.nextAttemptAt <= now);
   for (const item of ready) {
     try {
-      await publishSignedNostrEvent(item.event, currentRelays);
+      const baseUrls = activeRelayUrls(currentRelays, 'write');
+      const urls = [...new Set([...baseUrls, ...item.extraRelays])];
+      await publishSignedNostrEventToUrls(item.event, urls);
       pendingPublishEvents.delete(item.event.id);
       persistPendingPublishes();
     } catch {
@@ -1858,13 +1862,17 @@ function restorePendingPublishes() {
   if (!hasClientStorage()) return;
   try {
     const raw = localStorage.getItem(pendingPublishStorageKey);
-    const items = raw ? (JSON.parse(raw) as Array<{ event: NostrEvent; attempts?: number; nextAttemptAt?: number }>) : [];
+    const items = raw
+      ? (JSON.parse(raw) as Array<{ event: NostrEvent; attempts?: number; nextAttemptAt?: number; extraRelays?: string[] }>)
+      : [];
     for (const item of items) {
       if (!isPublishableCachedEvent(item.event)) continue;
+      const normalized = [...new Set((item.extraRelays ?? []).map(normalizeRelayUrl).filter(Boolean))];
       pendingPublishEvents.set(item.event.id, {
         event: item.event,
         attempts: Math.max(0, item.attempts ?? 0),
-        nextAttemptAt: Math.min(item.nextAttemptAt ?? 0, Date.now())
+        nextAttemptAt: Math.min(item.nextAttemptAt ?? 0, Date.now()),
+        extraRelays: normalized
       });
     }
     prunePendingPublishes();
@@ -1891,7 +1899,7 @@ function prunePendingPublishes() {
 }
 
 function isPublishableCachedEvent(event: NostrEvent | undefined): event is NostrEvent {
-  return Boolean(event && /^[0-9a-f]{64}$/i.test(event.id) && /^[0-9a-f]{64}$/i.test(event.pubkey) && event.sig && event.kind === 1);
+  return Boolean(event && /^[0-9a-f]{64}$/i.test(event.id) && /^[0-9a-f]{64}$/i.test(event.pubkey) && event.sig && event.kind >= 1);
 }
 
 export async function editNote(content: string, target: NostrEvent, extraTags: string[][] = []) {

@@ -7,7 +7,7 @@ const clientMocks = vi.hoisted(() => ({
   publishReaction: vi.fn(),
   publishRepost: vi.fn(),
   publishDeletion: vi.fn(),
-  publishSignedNostrEvent: vi.fn(),
+  publishSignedNostrEventToUrls: vi.fn(),
   signNote: vi.fn()
 }));
 
@@ -19,7 +19,7 @@ vi.mock('$lib/nostr/client', async (importOriginal) => {
     publishReaction: clientMocks.publishReaction,
     publishRepost: clientMocks.publishRepost,
     publishDeletion: clientMocks.publishDeletion,
-    publishSignedNostrEvent: clientMocks.publishSignedNostrEvent,
+    publishSignedNostrEventToUrls: clientMocks.publishSignedNostrEventToUrls,
     signNote: clientMocks.signNote
   };
 });
@@ -84,7 +84,7 @@ describe('app action optimism', () => {
     clientMocks.publishReaction.mockReset();
     clientMocks.publishRepost.mockReset();
     clientMocks.publishDeletion.mockReset();
-    clientMocks.publishSignedNostrEvent.mockReset();
+    clientMocks.publishSignedNostrEventToUrls.mockReset();
     clientMocks.signNote.mockReset();
     localStorage.removeItem('nostr-pending-publishes');
     eventStats.set({});
@@ -216,17 +216,17 @@ describe('app action optimism', () => {
     try {
       const signed = note('d'.repeat(64));
       clientMocks.signNote.mockResolvedValueOnce({ ...signed, pubkey: 'c'.repeat(64), content: 'queued hello', created_at: 3 });
-      clientMocks.publishSignedNostrEvent.mockResolvedValueOnce(undefined);
+      clientMocks.publishSignedNostrEventToUrls.mockResolvedValueOnce(undefined);
 
       await postNote('queued hello');
 
       expect(get(events).map((event) => event.content)).toContain('queued hello');
-      expect(clientMocks.publishSignedNostrEvent).not.toHaveBeenCalled();
+      expect(clientMocks.publishSignedNostrEventToUrls).not.toHaveBeenCalled();
 
       await vi.runOnlyPendingTimersAsync();
 
-      expect(clientMocks.publishSignedNostrEvent).toHaveBeenCalledTimes(1);
-      expect(clientMocks.publishSignedNostrEvent).toHaveBeenCalledWith(expect.objectContaining({ id: signed.id, content: 'queued hello' }), expect.any(Array));
+      expect(clientMocks.publishSignedNostrEventToUrls).toHaveBeenCalledTimes(1);
+      expect(clientMocks.publishSignedNostrEventToUrls).toHaveBeenCalledWith(expect.objectContaining({ id: signed.id, content: 'queued hello' }), expect.any(Array));
       expect(localStorage.getItem('nostr-pending-publishes')).toBeNull();
     } finally {
       vi.useRealTimers();
