@@ -47,16 +47,9 @@ The following operations have been wired behind the `window.nostrGit` bridge and
 - ✅ `stash` create/pop/drop/list
 - ✅ `submodule` update / list
 - ✅ `worktree` add / list / remove
+- ✅ `rebase` with continue / abort / skip
 
-Still to port:
-
-1. `stash` / `stash pop`
-2. `cherry-pick`
-3. `rebase` (interactive and non-interactive)
-4. `submodule` update
-5. `worktree` list/add/remove
-
-Each operation follows the existing `{ ok, error?, ... }` result shape so the SvelteKit UI consumes it without changes to error handling.
+Phase 1 operations are complete. Phase 2 and beyond remain future work.
 
 ### Phase 2 – Improve the Git runner
 
