@@ -16,6 +16,7 @@ const { getRefs } = require('./refs.cjs');
 const { getMergeBase, formatPatch } = require('./patch.cjs');
 const { getTags, createTag, deleteTag } = require('./tag.cjs');
 const { resetRepo } = require('./reset.cjs');
+const { cherryPick, abortCherryPick } = require('./cherry-pick.cjs');
 const store = require('./store.cjs');
 
 module.exports = {
@@ -45,5 +46,7 @@ module.exports = {
   createTag,
   deleteTag,
   resetRepo,
+  cherryPick,
+  abortCherryPick,
   store
 };

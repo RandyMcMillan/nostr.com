@@ -21,6 +21,8 @@
     fetchRepo,
     pullRepo,
     pushRepo,
+    cherryPickRepo,
+    abortCherryPickRepo,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
@@ -76,6 +78,10 @@
   let resetRef = '';
   let resetPublishing = false;
   let resetError = '';
+  let cherryPickOpen = false;
+  let cherryPickSha = '';
+  let cherryPickPublishing = false;
+  let cherryPickError = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: existingPrs = $events.filter(
@@ -438,6 +444,47 @@
     }
   }
 
+  function openCherryPick() {
+    cherryPickSha = commits[0]?.sha ?? '';
+    cherryPickError = '';
+    cherryPickOpen = true;
+  }
+
+  async function publishCherryPick() {
+    if (!entry?.localPath || !cherryPickSha.trim()) return;
+    cherryPickPublishing = true;
+    cherryPickError = '';
+    try {
+      const result = await cherryPickRepo(entry.localPath, cherryPickSha.trim());
+      cherryPickPublishing = false;
+      if (result.ok) {
+        cherryPickOpen = false;
+        cherryPickSha = '';
+        await loadRepoDetails();
+      } else {
+        cherryPickError = result.error || 'Cherry-pick failed.';
+      }
+    } catch (err) {
+      cherryPickPublishing = false;
+      cherryPickError = err instanceof Error ? err.message : 'Cherry-pick failed.';
+    }
+  }
+
+  async function abortCherryPick() {
+    if (!entry?.localPath) return;
+    error = '';
+    try {
+      const result = await abortCherryPickRepo(entry.localPath);
+      if (result.ok) {
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Could not abort cherry-pick.';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Could not abort cherry-pick.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -505,6 +552,7 @@
         {/if}
         <button class="git-button" on:click={openPatch} disabled={busy}><FileDiff size={14} /> New patch</button>
         <button class="git-button" on:click={openTag} disabled={busy}><Tag size={14} /> Tag</button>
+        <button class="git-button" on:click={openCherryPick} disabled={busy}>Cherry-pick</button>
         <button class="git-button" on:click={openReset} disabled={busy}>Reset</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
@@ -757,6 +805,31 @@
             <button disabled={resetPublishing} on:click={() => (resetOpen = false)}>Cancel</button>
             <button class="primary" disabled={resetPublishing || !resetRef.trim()} on:click={publishReset}>
               {resetPublishing ? 'Resetting...' : 'Reset'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if cherryPickOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !cherryPickPublishing && (cherryPickOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="cherry-pick-repo-title">
+        <div class="dialog-head">
+          <h2 id="cherry-pick-repo-title">Cherry-pick commit</h2>
+          <button class="icon-button small" aria-label="Close" disabled={cherryPickPublishing} on:click={() => (cherryPickOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <label>
+            Commit SHA
+            <input type="text" bind:value={cherryPickSha} placeholder={commits[0]?.sha ?? ''} />
+          </label>
+          {#if cherryPickError}<p class="error">{cherryPickError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={cherryPickPublishing} on:click={() => (cherryPickOpen = false)}>Cancel</button>
+            <button disabled={cherryPickPublishing} on:click={abortCherryPick}>Abort</button>
+            <button class="primary" disabled={cherryPickPublishing || !cherryPickSha.trim()} on:click={publishCherryPick}>
+              {cherryPickPublishing ? 'Applying...' : 'Cherry-pick'}
             </button>
           </div>
         </div>

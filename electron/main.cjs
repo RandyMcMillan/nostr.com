@@ -27,6 +27,8 @@ const {
   createTag,
   deleteTag,
   resetRepo,
+  cherryPick,
+  abortCherryPick,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -602,6 +604,29 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not reset.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:cherry-pick', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const sha = typeof payload?.sha === 'string' ? payload.sha : '';
+    if (!localPath || !sha) return { ok: false, error: 'Missing local path or commit SHA.' };
+    try {
+      await cherryPick(localPath, sha);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Cherry-pick failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:abort-cherry-pick', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await abortCherryPick(localPath);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not abort cherry-pick.' };
     }
   });
 

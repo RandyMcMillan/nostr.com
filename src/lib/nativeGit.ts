@@ -61,6 +61,8 @@ interface NostrGitBridge {
   createTag: (payload: { localPath: string; name: string; targetCommitSha: string }) => Promise<{ ok: boolean; error?: string }>;
   deleteTag: (payload: { localPath: string; name: string }) => Promise<{ ok: boolean; error?: string }>;
   reset: (payload: { localPath: string; mode: 'soft' | 'mixed' | 'hard'; ref: string }) => Promise<{ ok: boolean; error?: string }>;
+  cherryPick: (payload: { localPath: string; sha: string }) => Promise<{ ok: boolean; error?: string }>;
+  abortCherryPick: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -241,6 +243,14 @@ export async function resetRepo(
   ref: string
 ): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.reset({ localPath, mode, ref })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function cherryPickRepo(localPath: string, sha: string): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.cherryPick({ localPath, sha })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function abortCherryPickRepo(localPath: string): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.abortCherryPick({ localPath })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export function onCloneProgress(callback: (data: { address: string; text: string }) => void): () => void {
