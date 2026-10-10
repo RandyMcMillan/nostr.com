@@ -76,10 +76,19 @@ The following operations have been wired behind the `window.nostrGit` bridge and
 
 ### Phase 4 – UI polish and packaging
 
-- Surface the richer status fields (`upstreamBranch`, `currentTip`) in the repository panel and local repo list.
+- ✅ Surface the richer status fields (`upstreamBranch`, `currentTip`) in the repository panel and local repo list.
+- ✅ Wire the migrated diff parser's `hideWhitespace` option through the bridge and add a UI toggle in `/repos`.
+- ✅ Highlight auth failures in `GitRepoPanel` error messages with a credential hint.
 - Evaluate replacing the Electron shell with desktop's full UI chrome vs. keeping nostr.com as the host app.
 - Until a packaging decision is made, keep nostr.com as the host app and desktop as a library source.
 
+### NIP-34 kind support
+
+- ✅ Add `NIP34_PATCH_KIND` (30619) and `NIP34_ISSUE_KIND` (30620) constants.
+- ✅ Include them in `GIT_ROOT_KINDS` and `isGitEvent` so NIP-34 patches/issues render in feeds and threads.
+- ✅ Update `NoteCard` to render NIP-34 patches/issues and allow status changes on them.
+- ✅ Add unit tests covering the new kind classifications.
+
 ## Immediate next step
 
-Keep iterating on the bridge and UI: surface new parser fields, harden error handling for auth failures, and verify with `npm run check`, `npm test`, and periodic desktop builds. When the desktop integration is satisfactory, shift focus back to the original NIP-34 kind work.
+Verify the latest changes with a desktop build (`npm run desktop:mac:arm64` or `just desktop-mac-arm64`) and monitor CI. Continue packaging evaluation or add publish-time support for NIP-34 patch/issue kinds as needed.
