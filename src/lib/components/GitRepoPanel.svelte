@@ -858,6 +858,8 @@
         {#if status}
           <div class="git-status">
             <span><GitBranch size={14} /> {status.branch || 'detached'}</span>
+            {#if status.upstreamBranch}<span class="git-upstream">→ {status.upstreamBranch}</span>{/if}
+            {#if status.currentTip}<code>{status.currentTip.slice(0, 7)}</code>{/if}
             {#if status.ahead}<span>+{status.ahead}</span>{/if}
             {#if status.behind}<span>-{status.behind}</span>{/if}
             {#if status.files.length}<span>{status.files.length} changed</span>{/if}

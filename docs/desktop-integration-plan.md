@@ -49,7 +49,7 @@ The following operations have been wired behind the `window.nostrGit` bridge and
 - ✅ `worktree` add / list / remove
 - ✅ `rebase` with continue / abort / skip
 
-### Phase 2 – Improve the Git runner (in progress)
+### Phase 2 – Improve the Git runner (complete)
 
 - Align `electron/git/core.cjs` error classification and parsing with `desktop/app/src/lib/git/core.ts`.
   - ✅ Expanded `getDescriptionForError` to cover all `dugite` `GitError` values.
@@ -74,11 +74,12 @@ The following operations have been wired behind the `window.nostrGit` bridge and
 - ✅ Updated `src/lib/stores/app.ts` (`GitRepoState`) and `src/routes/repos/+page.svelte` to use `GitRefs`.
 - ✅ Added `upstreamBranch` and `currentTip` to `GitStatus` to match the migrated status parser.
 
-### Phase 4 – Optional unified packaging
+### Phase 4 – UI polish and packaging
 
-- If nostr.com wants desktop's full UI chrome, evaluate replacing the Electron shell with desktop's instead of the other way around.
-- Until then, keep nostr.com as the host app and desktop as a library source.
+- Surface the richer status fields (`upstreamBranch`, `currentTip`) in the repository panel and local repo list.
+- Evaluate replacing the Electron shell with desktop's full UI chrome vs. keeping nostr.com as the host app.
+- Until a packaging decision is made, keep nostr.com as the host app and desktop as a library source.
 
 ## Immediate next step
 
-Continue porting high-value operations (stash, cherry-pick, rebase) behind the bridge with tests and UI actions. Keep commits small and verify with `npm run check`, `npm test`, and periodic desktop builds.
+Keep iterating on the bridge and UI: surface new parser fields, harden error handling for auth failures, and verify with `npm run check`, `npm test`, and periodic desktop builds. When the desktop integration is satisfactory, shift focus back to the original NIP-34 kind work.

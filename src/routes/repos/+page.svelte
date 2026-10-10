@@ -323,8 +323,9 @@
     const status = statuses.get(repo.address);
     if (!status || !status.exists) return 'not a repo';
     const branch = status.branch || 'detached';
+    const upstream = status.upstreamBranch ? ` → ${status.upstreamBranch}` : '';
     const changes = status.files.length ? ` · ${status.files.length} changed` : '';
-    return `${branch}${changes}`;
+    return `${branch}${upstream}${changes}`;
   }
 </script>
 
