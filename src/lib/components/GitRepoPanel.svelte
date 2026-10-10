@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { FolderOpen, GitBranch, GitCommit, HardDrive, Loader2, MessageSquare, GitPullRequest, FileDiff } from '@lucide/svelte';
+  import { FolderOpen, GitBranch, GitCommit, HardDrive, Loader2, MessageSquare, GitPullRequest, FileDiff, Tag } from '@lucide/svelte';
   import type { NostrEvent } from '$lib/nostr/types';
   import { GIT_REPO_KIND, GIT_PR_KIND, GIT_PATCH_KIND } from '$lib/nostr/kinds';
   import {
@@ -14,6 +14,9 @@
     getRepoRemotes,
     getRepoMergeBase,
     getRepoFormatPatch,
+    getRepoTags,
+    createRepoTag,
+    deleteRepoTag,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
@@ -58,6 +61,12 @@
   let prUpdateOpen = false;
   let prUpdatePublishing = false;
   let prUpdateError = '';
+  let tags: { name: string; commitSha: string }[] = [];
+  let tagOpen = false;
+  let tagName = '';
+  let tagTarget = '';
+  let tagPublishing = false;
+  let tagError = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: existingPrs = $events.filter(
@@ -88,9 +97,10 @@
     if (!entry?.localPath) return;
     error = '';
     try {
-      [status, commits] = await Promise.all([
+      [status, commits, tags] = await Promise.all([
         getRepoStatus(entry.localPath),
-        getRepoLog(entry.localPath, 10)
+        getRepoLog(entry.localPath, 10),
+        getRepoTags(entry.localPath)
       ]);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Could not load repo details.';
@@ -292,6 +302,49 @@
     }
   }
 
+  function openTag() {
+    tagName = '';
+    tagTarget = commits[0]?.sha ?? '';
+    tagError = '';
+    tagOpen = true;
+  }
+
+  async function publishTag() {
+    if (!entry?.localPath || !tagName.trim() || !tagTarget.trim()) return;
+    tagPublishing = true;
+    tagError = '';
+    try {
+      const result = await createRepoTag(entry.localPath, tagName.trim(), tagTarget.trim());
+      tagPublishing = false;
+      if (result.ok) {
+        tagOpen = false;
+        tagName = '';
+        tagTarget = '';
+        await loadRepoDetails();
+      } else {
+        tagError = result.error || 'Could not create tag.';
+      }
+    } catch (err) {
+      tagPublishing = false;
+      tagError = err instanceof Error ? err.message : 'Could not create tag.';
+    }
+  }
+
+  async function removeTag(name: string) {
+    if (!entry?.localPath) return;
+    error = '';
+    try {
+      const result = await deleteRepoTag(entry.localPath, name);
+      if (result.ok) {
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Could not delete tag.';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Could not delete tag.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -355,6 +408,7 @@
           <button class="git-button" on:click={() => (prUpdateOpen = true)} disabled={busy}><GitPullRequest size={14} /> Update PR</button>
         {/if}
         <button class="git-button" on:click={openPatch} disabled={busy}><FileDiff size={14} /> New patch</button>
+        <button class="git-button" on:click={openTag} disabled={busy}><Tag size={14} /> Tag</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
         {#if cloneUrls.length}
@@ -397,6 +451,20 @@
           </ul>
         {:else}
           <span class="git-empty">No commits yet.</span>
+        {/if}
+        {#if tags.length}
+          <div class="git-tags">
+            <h4>Tags</h4>
+            <ul>
+              {#each tags as tag (tag.name)}
+                <li>
+                  <span class="git-tag-name"><Tag size={12} /> {tag.name}</span>
+                  <code>{tag.commitSha.slice(0, 7)}</code>
+                  <button class="icon-button small" aria-label="Delete tag" on:click={() => removeTag(tag.name)}>×</button>
+                </li>
+              {/each}
+            </ul>
+          </div>
         {/if}
       </div>
     {/if}
@@ -532,6 +600,34 @@
           {#if prUpdateError}<p class="error">{prUpdateError}</p>{/if}
           <div class="dialog-actions">
             <button disabled={prUpdatePublishing} on:click={() => (prUpdateOpen = false)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if tagOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !tagPublishing && (tagOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="tag-repo-title">
+        <div class="dialog-head">
+          <h2 id="tag-repo-title">Create tag</h2>
+          <button class="icon-button small" aria-label="Close" disabled={tagPublishing} on:click={() => (tagOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <label>
+            Name
+            <input type="text" bind:value={tagName} placeholder="v1.0.0" />
+          </label>
+          <label>
+            Target commit
+            <input type="text" bind:value={tagTarget} placeholder={commits[0]?.sha ?? ''} />
+          </label>
+          {#if tagError}<p class="error">{tagError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={tagPublishing} on:click={() => (tagOpen = false)}>Cancel</button>
+            <button class="primary" disabled={tagPublishing || !tagName.trim() || !tagTarget.trim()} on:click={publishTag}>
+              {tagPublishing ? 'Creating...' : 'Create'}
+            </button>
           </div>
         </div>
       </div>
