@@ -63,7 +63,8 @@ The following operations have been wired behind the `window.nostrGit` bridge and
   - ✅ Added `electron/git/diff.test.mjs` covering modified, staged, raw-header stripping, stage, and unstage.
   - ✅ Migrated `electron/git/log.cjs` to NUL-separated field parsing (desktop-style) so subjects/authors containing delimiters are safe.
   - ✅ Added `electron/git/log.test.mjs` covering fresh repos, ordering, limits, and delimiter safety.
-  - ⬜ Migrate refs parser.
+  - ✅ Migrated `electron/git/refs.cjs` to NUL-separated `for-each-ref` fields and desktop-style `getSymbolicRef` / `formatAsLocalRef` helpers.
+  - ✅ Added `electron/git/refs.test.mjs` covering branches, tags, detached HEAD, ref formatting, and symbolic ref reading.
 - Keep the IPC payload contracts stable so `src/lib/nativeGit.ts` needs only additive changes.
 
 ### Phase 3 – Shared types
