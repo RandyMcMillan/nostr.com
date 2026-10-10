@@ -25,6 +25,10 @@
     abortCherryPickRepo,
     addRepoRemote,
     removeRepoRemote,
+    getRepoStashes,
+    createRepoStash,
+    popRepoStash,
+    dropRepoStash,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
@@ -89,6 +93,11 @@
   let remoteUrl = '';
   let remotePublishing = false;
   let remoteError = '';
+  let stashes: { sha: string; ref: string; message: string }[] = [];
+  let stashOpen = false;
+  let stashMessage = '';
+  let stashPublishing = false;
+  let stashError = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: existingPrs = $events.filter(
@@ -119,11 +128,12 @@
     if (!entry?.localPath) return;
     error = '';
     try {
-      [status, commits, tags, prRemotes] = await Promise.all([
+      [status, commits, tags, prRemotes, stashes] = await Promise.all([
         getRepoStatus(entry.localPath),
         getRepoLog(entry.localPath, 10),
         getRepoTags(entry.localPath),
-        getRepoRemotes(entry.localPath)
+        getRepoRemotes(entry.localPath),
+        getRepoStashes(entry.localPath)
       ]);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Could not load repo details.';
@@ -536,6 +546,62 @@
     }
   }
 
+  function openStash() {
+    stashMessage = '';
+    stashError = '';
+    stashOpen = true;
+  }
+
+  async function publishStash() {
+    if (!entry?.localPath) return;
+    stashPublishing = true;
+    stashError = '';
+    try {
+      const result = await createRepoStash(entry.localPath, stashMessage.trim() || undefined);
+      stashPublishing = false;
+      if (result.ok) {
+        stashOpen = false;
+        stashMessage = '';
+        await loadRepoDetails();
+      } else {
+        stashError = result.error || 'Could not create stash.';
+      }
+    } catch (err) {
+      stashPublishing = false;
+      stashError = err instanceof Error ? err.message : 'Could not create stash.';
+    }
+  }
+
+  async function applyStash(ref: string) {
+    if (!entry?.localPath || !ref) return;
+    error = '';
+    try {
+      const result = await popRepoStash(entry.localPath, ref);
+      if (result.ok) {
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Could not pop stash.';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Could not pop stash.';
+    }
+  }
+
+  async function discardStash(ref: string) {
+    if (!entry?.localPath || !ref) return;
+    error = '';
+    try {
+      const result = await dropRepoStash(entry.localPath, ref);
+      if (result.ok) {
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Could not drop stash.';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Could not drop stash.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -606,6 +672,7 @@
         <button class="git-button" on:click={openCherryPick} disabled={busy}>Cherry-pick</button>
         <button class="git-button" on:click={openReset} disabled={busy}>Reset</button>
         <button class="git-button" on:click={openRemote} disabled={busy}>Remote</button>
+        <button class="git-button" on:click={openStash} disabled={busy}>Stash</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
         {#if cloneUrls.length}
@@ -672,6 +739,23 @@
                   <span class="git-remote-name">{remote.name}</span>
                   <span class="git-remote-url">{remote.url}</span>
                   <button class="icon-button small" aria-label="Remove remote" on:click={() => deleteRemote(remote.name)}>×</button>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+        {#if stashes.length}
+          <div class="git-stashes">
+            <h4>Stashes</h4>
+            <ul>
+              {#each stashes as stash (stash.ref)}
+                <li>
+                  <code>{stash.ref}</code>
+                  <span class="git-stash-message">{stash.message}</span>
+                  <span>
+                    <button class="git-button small" on:click={() => applyStash(stash.ref)}>Pop</button>
+                    <button class="icon-button small" aria-label="Drop stash" on:click={() => discardStash(stash.ref)}>×</button>
+                  </span>
                 </li>
               {/each}
             </ul>
@@ -924,6 +1008,30 @@
             <button disabled={remotePublishing} on:click={() => (remoteOpen = false)}>Cancel</button>
             <button class="primary" disabled={remotePublishing || !remoteName.trim() || !remoteUrl.trim()} on:click={publishRemote}>
               {remotePublishing ? 'Adding...' : 'Add'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if stashOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !stashPublishing && (stashOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="stash-repo-title">
+        <div class="dialog-head">
+          <h2 id="stash-repo-title">Create stash</h2>
+          <button class="icon-button small" aria-label="Close" disabled={stashPublishing} on:click={() => (stashOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <label>
+            Message (optional)
+            <input type="text" bind:value={stashMessage} placeholder="Work in progress" />
+          </label>
+          {#if stashError}<p class="error">{stashError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={stashPublishing} on:click={() => (stashOpen = false)}>Cancel</button>
+            <button class="primary" disabled={stashPublishing} on:click={publishStash}>
+              {stashPublishing ? 'Stashing...' : 'Stash'}
             </button>
           </div>
         </div>

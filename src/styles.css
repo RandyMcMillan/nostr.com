@@ -1777,6 +1777,35 @@ label span, label strong { color: var(--text); }
   white-space: nowrap;
   color: var(--muted);
 }
+.git-stashes {
+  display: grid;
+  gap: 8px;
+}
+.git-stashes h4 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.git-stashes ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.git-stashes li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.git-stash-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .repo-list {
   display: grid;
   gap: 10px;

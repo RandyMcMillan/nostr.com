@@ -31,6 +31,10 @@ const {
   resetRepo,
   cherryPick,
   abortCherryPick,
+  getStashes,
+  createStash,
+  popStash,
+  dropStash,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -654,6 +658,53 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not abort cherry-pick.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:stashes', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const stashes = await getStashes(localPath);
+      return { ok: true, stashes };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not list stashes.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:create-stash', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const message = typeof payload?.message === 'string' ? payload.message : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await createStash(localPath, message);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not create stash.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:pop-stash', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const ref = typeof payload?.ref === 'string' ? payload.ref : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await popStash(localPath, ref);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not pop stash.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:drop-stash', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const ref = typeof payload?.ref === 'string' ? payload.ref : '';
+    if (!localPath || !ref) return { ok: false, error: 'Missing local path or stash ref.' };
+    try {
+      await dropStash(localPath, ref);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not drop stash.' };
     }
   });
 
