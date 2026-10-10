@@ -45,6 +45,7 @@ The following operations have been wired behind the `window.nostrGit` bridge and
 - ✅ `cherry-pick` with abort support
 - ✅ `remote` add/list/remove
 - ✅ `stash` create/pop/drop/list
+- ✅ `submodule` update / list
 
 Still to port:
 
