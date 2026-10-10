@@ -1,153 +1,78 @@
+# Just recipes for nostr.com (SvelteKit + Electron + Capacitor)
+# Run `just` to list recipes.
+
+set dotenv-load := true
+
+export NODE_VERSION := "22"
+export ACT_WORKFLOW := ".github/workflows/ci.yml"
+export ACT_ARCH := env_var_or_default("ACT_ARCH", "linux/amd64")
+
+# Default: list all recipes
 default:
-  just --choose
+    @just --list
 
-help:
-  @make help
+# Install dependencies
+install:
+    npm ci
 
-rm_cargo_lock:
-  @make rm_cargo_lock
+# Start Vite dev server
+dev:
+    npm run dev
 
-all:
-  @make all
+# Build the static site
+build:
+    npm run build
 
-bin:
-  @make bin
+# Preview the built site
+preview:
+    npm run preview
 
-cargo-help:
-  @make cargo-help
+# Run Svelte + TypeScript checks
+check:
+    npm run check
 
-cargo-release-all:
-  @make cargo-release-all
-
-cargo-clean-release:
-  @make cargo-clean-release
-
-cargo-publish-all:
-  @make cargo-publish-all
-
-cargo-install-bins:
-  @make cargo-install-bins
-
-cargo-build:
-  @make cargo-build
-
-cargo-install:
-  @make cargo-install
-
-cargo-sort:
-  @make cargo-sort
-
-cargo-build-release:
-  @make cargo-build-release
-
-cargo-check:
-  @make cargo-check
-
-cargo-bench:
-  @make cargo-bench
-
-cargo-test:
-  @make cargo-test
-
-cargo-test--ignored:
-  @make cargo-test--ignored
-
-cargo-test-workspace:
-  @make cargo-test-workspace
-
+# Run the Vitest test suite
 test:
-  @make test
+    npm test
 
-cargo-test-nightly:
-  @make cargo-test-nightly
+# Generate app icons from source
+icons:
+    npm run icons
 
-cargo-test-nightly-workspace:
-  @make cargo-test-nightly-workspace
+# Build Electron DMG for macOS (universal binary)
+desktop-mac:
+    npm run desktop:mac
 
-cargo-test-types-nip_three_four:
-  @make cargo-test-types-nip_three_four
+# Build Electron DMG for macOS (Apple Silicon)
+desktop-mac-arm64:
+    npm run desktop:mac:arm64
 
-cargo-clippy-workspace:
-  @make cargo-clippy-workspace
+# Build Electron DMG for macOS (Intel)
+desktop-mac-x64:
+    npm run desktop:mac:x64
 
-cargo-clippy-fix-workspace:
-  @make cargo-clippy-fix-workspace
+# Build Electron AppImage for Linux
+desktop-linux:
+    npm run desktop:linux
 
-clippy:
-  @make clippy
+# Build Electron NSIS installer for Windows
+desktop-win:
+    npm run desktop:win
 
-cargo-report:
-  @make cargo-report
+# Build all desktop targets
+desktop-all: desktop-mac desktop-linux desktop-win
 
-cargo-run:
-  @make cargo-run
+# Capacitor sync for mobile builds
+cap-sync:
+    npm run cap:sync
 
-cargo-git-cliff-changelog:
-  @make cargo-git-cliff-changelog
+# Run CI workflow locally with act (works on Apple Silicon with --container-architecture)
+act-ci:
+    act -W {{ACT_WORKFLOW}} --container-architecture {{ACT_ARCH}}
 
-dep-graph:
-  @make dep-graph
+# Run CI workflow locally with verbose act output
+act-ci-verbose:
+    act -v -W {{ACT_WORKFLOW}} --container-architecture {{ACT_ARCH}}
 
-gnostr-chat:
-  @make gnostr-chat
-
-fetch-by-id:
-  @make fetch-by-id
-
-fetch-by-kind-and-author:
-  @make fetch-by-kind-and-author
-
-gnostr-note-debug:
-  @make gnostr-note-debug
-
-gnostr-note-trace:
-  @make gnostr-note-trace
-
-post_event:
-  @make post_event
-
-post_from_files:
-  @make post_from_files
-
-broadcast_event_list:
-  @make broadcast_event_list
-
-nip_thirty_four_requests:
-  @make nip_thirty_four_requests
-
-plan-dist-manifest:
-  @make plan-dist-manifest
-
-docker:
-  @make docker
-
-docker-tui:
-  @make docker-tui
-
-docker-chat:
-  @make docker-chat
-
-docker-shared:
-  @make docker-shared
-
-gh-act-run-all:
-  @make gh-act-run-all
-
-gnostr-test-matrix:
-  @make gnostr-test-matrix
-
-gnostr-test-macos:
-  @make gnostr-test-macos
-
-gnostr-test-macos-intel:
-  @make gnostr-test-macos-intel
-
-act-cargo-cross-setup:
-  @make act-cargo-cross-setup
-
-act-cargo-cross:
-  @make act-cargo-cross
-
-act-gnostr-act:
-  @make act-gnostr-act
-
+# Run the full local validation that CI runs
+ci: check test
