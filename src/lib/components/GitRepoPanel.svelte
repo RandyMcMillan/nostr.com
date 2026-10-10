@@ -20,6 +20,7 @@
     resetRepo,
     fetchRepo,
     pullRepo,
+    pushRepo,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
@@ -418,6 +419,25 @@
     }
   }
 
+  async function push() {
+    if (!entry?.localPath) return;
+    busy = true;
+    error = '';
+    try {
+      const result = await pushRepo(entry.localPath);
+      busy = false;
+      if (result.ok) {
+        message = 'Pushed';
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Push failed.';
+      }
+    } catch (err) {
+      busy = false;
+      error = err instanceof Error ? err.message : 'Push failed.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -478,6 +498,7 @@
         </button>
         <button class="git-button" on:click={fetch} disabled={busy}>Fetch</button>
         <button class="git-button" on:click={pull} disabled={busy}>Pull</button>
+        <button class="git-button" on:click={push} disabled={busy}>Push</button>
         <button class="git-button" on:click={openPr} disabled={busy}><GitPullRequest size={14} /> New PR</button>
         {#if existingPrs.length}
           <button class="git-button" on:click={() => (prUpdateOpen = true)} disabled={busy}><GitPullRequest size={14} /> Update PR</button>
