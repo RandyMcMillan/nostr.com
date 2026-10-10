@@ -23,6 +23,9 @@ const {
   getRefs,
   getMergeBase,
   formatPatch,
+  getTags,
+  createTag,
+  deleteTag,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -547,6 +550,44 @@ function registerNostrGitHandlers() {
       return { ok: true, patch };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not format patch.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:tags', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const tags = await getTags(localPath);
+      return { ok: true, tags };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not list tags.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:create-tag', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const name = typeof payload?.name === 'string' ? payload.name : '';
+    const targetCommitSha = typeof payload?.targetCommitSha === 'string' ? payload.targetCommitSha : '';
+    if (!localPath || !name || !targetCommitSha) {
+      return { ok: false, error: 'Missing local path, tag name, or target commit.' };
+    }
+    try {
+      await createTag(localPath, name, targetCommitSha);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not create tag.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:delete-tag', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const name = typeof payload?.name === 'string' ? payload.name : '';
+    if (!localPath || !name) return { ok: false, error: 'Missing local path or tag name.' };
+    try {
+      await deleteTag(localPath, name);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not delete tag.' };
     }
   });
 

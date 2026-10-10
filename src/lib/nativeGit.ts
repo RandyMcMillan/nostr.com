@@ -57,6 +57,9 @@ interface NostrGitBridge {
   }>;
   mergeBase: (payload: { localPath: string; refA: string; refB: string }) => Promise<{ ok: boolean; error?: string; commit?: string }>;
   formatPatch: (payload: { localPath: string; baseRef?: string; single?: string }) => Promise<{ ok: boolean; error?: string; patch?: string }>;
+  tags: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; tags?: { name: string; commitSha: string }[] }>;
+  createTag: (payload: { localPath: string; name: string; targetCommitSha: string }) => Promise<{ ok: boolean; error?: string }>;
+  deleteTag: (payload: { localPath: string; name: string }) => Promise<{ ok: boolean; error?: string }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -212,6 +215,23 @@ export async function openRepoFolder(localPath: string): Promise<{ ok: boolean; 
 
 export async function chooseRepoFolder(): Promise<{ ok: boolean; error?: string; canceled?: boolean; localPath?: string }> {
   return (await bridge()?.chooseFolder()) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function getRepoTags(localPath: string): Promise<{ name: string; commitSha: string }[]> {
+  const result = await bridge()?.tags({ localPath });
+  return result?.ok && Array.isArray(result.tags) ? result.tags : [];
+}
+
+export async function createRepoTag(
+  localPath: string,
+  name: string,
+  targetCommitSha: string
+): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.createTag({ localPath, name, targetCommitSha })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function deleteRepoTag(localPath: string, name: string): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.deleteTag({ localPath, name })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export function onCloneProgress(callback: (data: { address: string; text: string }) => void): () => void {

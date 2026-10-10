@@ -14,6 +14,7 @@ const { pushRepository } = require('./push.cjs');
 const { getDiff, stageFile, unstageFile } = require('./diff.cjs');
 const { getRefs } = require('./refs.cjs');
 const { getMergeBase, formatPatch } = require('./patch.cjs');
+const { getTags, createTag, deleteTag } = require('./tag.cjs');
 const store = require('./store.cjs');
 
 module.exports = {
@@ -39,5 +40,8 @@ module.exports = {
   getRefs,
   getMergeBase,
   formatPatch,
+  getTags,
+  createTag,
+  deleteTag,
   store
 };
