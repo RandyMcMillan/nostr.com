@@ -71,6 +71,9 @@ interface NostrGitBridge {
   dropStash: (payload: { localPath: string; ref: string }) => Promise<{ ok: boolean; error?: string }>;
   submodules: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; submodules?: { sha: string; path: string; active: boolean }[] }>;
   updateSubmodules: (payload: { localPath: string; force?: boolean }) => Promise<{ ok: boolean; error?: string }>;
+  worktrees: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; worktrees?: { path: string; head: string; branch: string | null; isDetached: boolean; main: boolean }[] }>;
+  addWorktree: (payload: { localPath: string; worktreePath: string; createBranch?: string; commitish?: string }) => Promise<{ ok: boolean; error?: string }>;
+  removeWorktree: (payload: { localPath: string; worktreePath: string; force?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -293,6 +296,23 @@ export async function getRepoSubmodules(localPath: string): Promise<{ sha: strin
 
 export async function updateRepoSubmodules(localPath: string, force = false): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.updateSubmodules({ localPath, force })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function getRepoWorktrees(localPath: string): Promise<{ path: string; head: string; branch: string | null; isDetached: boolean; main: boolean }[]> {
+  const result = await bridge()?.worktrees({ localPath });
+  return result?.ok && Array.isArray(result.worktrees) ? result.worktrees : [];
+}
+
+export async function addRepoWorktree(
+  localPath: string,
+  worktreePath: string,
+  options: { createBranch?: string; commitish?: string } = {}
+): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.addWorktree({ localPath, worktreePath, ...options })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function removeRepoWorktree(localPath: string, worktreePath: string, force = false): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.removeWorktree({ localPath, worktreePath, force })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export function onCloneProgress(callback: (data: { address: string; text: string }) => void): () => void {

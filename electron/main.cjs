@@ -37,6 +37,9 @@ const {
   dropStash,
   updateSubmodules,
   listSubmodules,
+  listWorktrees,
+  addWorktree,
+  removeWorktree,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -729,6 +732,44 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not update submodules.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:worktrees', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const worktrees = await listWorktrees(localPath);
+      return { ok: true, worktrees };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not list worktrees.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:add-worktree', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const worktreePath = typeof payload?.worktreePath === 'string' ? payload.worktreePath : '';
+    if (!localPath || !worktreePath) return { ok: false, error: 'Missing local path or worktree path.' };
+    try {
+      await addWorktree(localPath, worktreePath, {
+        createBranch: typeof payload?.createBranch === 'string' ? payload.createBranch : undefined,
+        commitish: typeof payload?.commitish === 'string' ? payload.commitish : undefined
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not add worktree.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:remove-worktree', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const worktreePath = typeof payload?.worktreePath === 'string' ? payload.worktreePath : '';
+    if (!localPath || !worktreePath) return { ok: false, error: 'Missing local path or worktree path.' };
+    try {
+      await removeWorktree(localPath, worktreePath, payload?.force === true);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not remove worktree.' };
     }
   });
 

@@ -31,6 +31,9 @@
     dropRepoStash,
     getRepoSubmodules,
     updateRepoSubmodules,
+    getRepoWorktrees,
+    addRepoWorktree,
+    removeRepoWorktree,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
@@ -101,6 +104,12 @@
   let stashPublishing = false;
   let stashError = '';
   let submodules: { sha: string; path: string; active: boolean }[] = [];
+  let worktrees: { path: string; head: string; branch: string | null; isDetached: boolean; main: boolean }[] = [];
+  let worktreeOpen = false;
+  let worktreePath = '';
+  let worktreeBranch = '';
+  let worktreePublishing = false;
+  let worktreeError = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: existingPrs = $events.filter(
@@ -131,13 +140,14 @@
     if (!entry?.localPath) return;
     error = '';
     try {
-      [status, commits, tags, prRemotes, stashes, submodules] = await Promise.all([
+      [status, commits, tags, prRemotes, stashes, submodules, worktrees] = await Promise.all([
         getRepoStatus(entry.localPath),
         getRepoLog(entry.localPath, 10),
         getRepoTags(entry.localPath),
         getRepoRemotes(entry.localPath),
         getRepoStashes(entry.localPath),
-        getRepoSubmodules(entry.localPath)
+        getRepoSubmodules(entry.localPath),
+        getRepoWorktrees(entry.localPath)
       ]);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Could not load repo details.';
@@ -625,6 +635,51 @@
     }
   }
 
+  function openWorktree() {
+    worktreePath = '';
+    worktreeBranch = '';
+    worktreeError = '';
+    worktreeOpen = true;
+  }
+
+  async function publishWorktree() {
+    if (!entry?.localPath || !worktreePath.trim()) return;
+    worktreePublishing = true;
+    worktreeError = '';
+    try {
+      const result = await addRepoWorktree(entry.localPath, worktreePath.trim(), {
+        createBranch: worktreeBranch.trim() || undefined
+      });
+      worktreePublishing = false;
+      if (result.ok) {
+        worktreeOpen = false;
+        worktreePath = '';
+        worktreeBranch = '';
+        await loadRepoDetails();
+      } else {
+        worktreeError = result.error || 'Could not add worktree.';
+      }
+    } catch (err) {
+      worktreePublishing = false;
+      worktreeError = err instanceof Error ? err.message : 'Could not add worktree.';
+    }
+  }
+
+  async function deleteWorktree(worktreePathToRemove: string) {
+    if (!entry?.localPath || !worktreePathToRemove) return;
+    error = '';
+    try {
+      const result = await removeRepoWorktree(entry.localPath, worktreePathToRemove);
+      if (result.ok) {
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Could not remove worktree.';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Could not remove worktree.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -697,6 +752,7 @@
         <button class="git-button" on:click={openRemote} disabled={busy}>Remote</button>
         <button class="git-button" on:click={openStash} disabled={busy}>Stash</button>
         <button class="git-button" on:click={updateSubmodules} disabled={busy}>Submodules</button>
+        <button class="git-button" on:click={openWorktree} disabled={busy}>Worktree</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
         {#if cloneUrls.length}
@@ -795,6 +851,23 @@
                   <span class="git-submodule-path">{submodule.path}</span>
                   <span class="git-submodule-status">{submodule.active ? 'active' : 'inactive'}</span>
                 </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+        {#if worktrees.length > 1}
+          <div class="git-worktrees">
+            <h4>Worktrees</h4>
+            <ul>
+              {#each worktrees as worktree (worktree.path)}
+                {#if !worktree.main}
+                  <li>
+                    <code>{worktree.head.slice(0, 7)}</code>
+                    <span class="git-worktree-path">{worktree.path}</span>
+                    <span class="git-worktree-branch">{worktree.branch ?? 'detached'}</span>
+                    <button class="icon-button small" aria-label="Remove worktree" on:click={() => deleteWorktree(worktree.path)}>×</button>
+                  </li>
+                {/if}
               {/each}
             </ul>
           </div>
@@ -1070,6 +1143,34 @@
             <button disabled={stashPublishing} on:click={() => (stashOpen = false)}>Cancel</button>
             <button class="primary" disabled={stashPublishing} on:click={publishStash}>
               {stashPublishing ? 'Stashing...' : 'Stash'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if worktreeOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !worktreePublishing && (worktreeOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="worktree-repo-title">
+        <div class="dialog-head">
+          <h2 id="worktree-repo-title">Add worktree</h2>
+          <button class="icon-button small" aria-label="Close" disabled={worktreePublishing} on:click={() => (worktreeOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <label>
+            Path
+            <input type="text" bind:value={worktreePath} placeholder="/path/to/worktree" />
+          </label>
+          <label>
+            New branch (optional)
+            <input type="text" bind:value={worktreeBranch} placeholder="feature-branch" />
+          </label>
+          {#if worktreeError}<p class="error">{worktreeError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={worktreePublishing} on:click={() => (worktreeOpen = false)}>Cancel</button>
+            <button class="primary" disabled={worktreePublishing || !worktreePath.trim()} on:click={publishWorktree}>
+              {worktreePublishing ? 'Adding...' : 'Add'}
             </button>
           </div>
         </div>
