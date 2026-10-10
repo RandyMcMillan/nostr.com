@@ -1621,7 +1621,6 @@ export interface GitIssueInput {
   subject: string;
   content: string;
   labels?: string[];
-  repoRelays?: string[];
 }
 
 export interface GitPullRequestInput {
@@ -1632,7 +1631,6 @@ export interface GitPullRequestInput {
   cloneUrls: string[];
   branchName?: string;
   labels?: string[];
-  repoRelays?: string[];
 }
 
 export interface GitPatchInput {
@@ -1641,7 +1639,6 @@ export interface GitPatchInput {
   tipCommit: string;
   parentCommit: string;
   earliestUniqueCommit?: string;
-  repoRelays?: string[];
 }
 
 export async function publishGitRepoState(state: GitRepoState) {
@@ -1685,9 +1682,11 @@ export async function publishGitIssue(input: GitIssueInput) {
   const identifier = identifierParts.join(':');
 
   const { GIT_ISSUE_KIND } = await import('$lib/nostr/kinds');
-  const aTag: string[] = ['a', `30617:${pubkey}:${identifier}`];
-  if (input.repoRelays?.[0]) aTag.push(input.repoRelays[0]);
-  const tags: string[][] = [aTag, ['p', pubkey], ['subject', input.subject]];
+  const tags: string[][] = [
+    ['a', `30617:${pubkey}:${identifier}`],
+    ['p', pubkey],
+    ['subject', input.subject]
+  ];
   for (const label of input.labels ?? []) {
     if (label) tags.push(['t', label]);
   }
@@ -1710,9 +1709,12 @@ export async function publishGitPullRequest(input: GitPullRequestInput) {
   const identifier = identifierParts.join(':');
 
   const { GIT_PR_KIND } = await import('$lib/nostr/kinds');
-  const aTag: string[] = ['a', `30617:${pubkey}:${identifier}`];
-  if (input.repoRelays?.[0]) aTag.push(input.repoRelays[0]);
-  const tags: string[][] = [aTag, ['p', pubkey], ['subject', input.subject], ['c', input.tipCommit]];
+  const tags: string[][] = [
+    ['a', `30617:${pubkey}:${identifier}`],
+    ['p', pubkey],
+    ['subject', input.subject],
+    ['c', input.tipCommit]
+  ];
   for (const url of input.cloneUrls) {
     if (url) tags.push(['clone', url]);
   }
@@ -1739,9 +1741,13 @@ export async function publishGitPatch(input: GitPatchInput) {
   const identifier = identifierParts.join(':');
 
   const { GIT_PATCH_KIND } = await import('$lib/nostr/kinds');
-  const aTag: string[] = ['a', `30617:${pubkey}:${identifier}`];
-  if (input.repoRelays?.[0]) aTag.push(input.repoRelays[0]);
-  const tags: string[][] = [aTag, ['p', pubkey], ['t', 'root'], ['commit', input.tipCommit], ['parent-commit', input.parentCommit]];
+  const tags: string[][] = [
+    ['a', `30617:${pubkey}:${identifier}`],
+    ['p', pubkey],
+    ['t', 'root'],
+    ['commit', input.tipCommit],
+    ['parent-commit', input.parentCommit]
+  ];
   if (input.earliestUniqueCommit) tags.push(['r', input.earliestUniqueCommit]);
 
   const event = await signEvent(currentSession, GIT_PATCH_KIND, input.patch, tags);

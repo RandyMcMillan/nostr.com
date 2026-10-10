@@ -28,7 +28,6 @@
   const name = event.tags.find((tag) => tag[0] === 'name')?.[1] ?? dTag ?? 'repo';
   const cloneUrls = event.tags.filter((tag) => tag[0] === 'clone').map((tag) => tag[1]);
   const defaultBranch = event.tags.find((tag) => tag[0] === 'default_branch')?.[1];
-  const repoRelays = event.tags.filter((tag) => tag[0] === 'relays').map((tag) => tag[1]);
 
   let busy = false;
   let message = '';
@@ -194,8 +193,7 @@
         repoAddress: address,
         subject: issueSubject.trim(),
         content: issueBody.trim(),
-        labels: issueLabels.split(',').map((l) => l.trim()).filter(Boolean),
-        repoRelays
+        labels: issueLabels.split(',').map((l) => l.trim()).filter(Boolean)
       });
       issuePublishing = false;
       issueOpen = false;
@@ -235,8 +233,7 @@
         tipCommit: tip,
         cloneUrls: prRemotes.map((remote) => remote.url),
         branchName: branch,
-        labels: prLabels.split(',').map((l) => l.trim()).filter(Boolean),
-        repoRelays
+        labels: prLabels.split(',').map((l) => l.trim()).filter(Boolean)
       });
       prPublishing = false;
       prOpen = false;
@@ -284,8 +281,7 @@
         repoAddress: address,
         patch,
         tipCommit: tip.sha,
-        parentCommit: tip.parents[0] ?? '',
-        repoRelays
+        parentCommit: tip.parents[0] ?? ''
       });
       patchPublishing = false;
       patchOpen = false;
