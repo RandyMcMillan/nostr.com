@@ -61,7 +61,8 @@ The following operations have been wired behind the `window.nostrGit` bridge and
   - ✅ Added `electron/git/status.test.mjs` covering untracked, staged, modified, renamed, and mocked buffer parsing.
   - ✅ Migrated `electron/git/diff.cjs` to desktop-style `--patch-with-raw -z` output and added `hideWhitespace` option support.
   - ✅ Added `electron/git/diff.test.mjs` covering modified, staged, raw-header stripping, stage, and unstage.
-  - ⬜ Migrate log parser.
+  - ✅ Migrated `electron/git/log.cjs` to NUL-separated field parsing (desktop-style) so subjects/authors containing delimiters are safe.
+  - ✅ Added `electron/git/log.test.mjs` covering fresh repos, ordering, limits, and delimiter safety.
   - ⬜ Migrate refs parser.
 - Keep the IPC payload contracts stable so `src/lib/nativeGit.ts` needs only additive changes.
 
