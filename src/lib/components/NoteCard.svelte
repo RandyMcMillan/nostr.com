@@ -24,7 +24,7 @@ import {
 } from '$lib/nostr/kinds';
   import { activeRelayUrls, fetchLikeAuthors, fetchProfiles, subscribeZapReceipts } from '$lib/nostr/client';
   import { createZapInvoice, loadZapInfo, type ZapInfo } from '$lib/nostr/zap';
-  import { deleteNote, displayEventForEvent, filterByHashtag, likedStateForEvent, mergeProfileRecords, muteAccount, prefetchThreadPreview, profiles, publishGitStatus, reactToNote, refreshEventStats, relays, reportNote, repostedStateForEvent, repostNote, session, startEdit, startQuote, startReply, statsForEvent, watchVisibleNoteStats } from '$lib/stores/app';
+  import { deleteNote, displayEventForEvent, filterByHashtag, gitLatestStatus, likedStateForEvent, mergeProfileRecords, muteAccount, prefetchThreadPreview, profiles, publishGitStatus, reactToNote, refreshEventStats, relays, reportNote, repostedStateForEvent, repostNote, session, startEdit, startQuote, startReply, statsForEvent, watchVisibleNoteStats } from '$lib/stores/app';
   import { appPath } from '$lib/paths';
   import { pauseWhenHidden } from '$lib/actions/pauseWhenHidden';
   import { lazyContentRootMargin, prefersLeanMedia } from '$lib/clientCapabilities';
@@ -183,6 +183,9 @@ import {
   $: gitLabels = displayEvent.tags
     .filter((tag) => tag[0] === 't' && tag[1] && tag[1] !== 'root')
     .map((tag) => tag[1]);
+  $: latestStatusEvent = $gitLatestStatus[event.id];
+  $: gitStatusLabel = latestStatusEvent ? statusLabelForKind(latestStatusEvent.kind) : undefined;
+  $: gitStatusClass = latestStatusEvent ? statusClassForKind(latestStatusEvent.kind) : undefined;
   $: repostActionActive = reposted || ownQuoteRepost;
   $: canZap = Boolean(zapInfo && $session);
   $: zapTitle = !$session ? 'Sign in to zap' : zapInfo ? 'Zap this post' : zapChecking ? 'Checking zap support' : 'This user has not enabled zaps';
@@ -213,6 +216,22 @@ import {
 
   function isSameDay(date: Date, other: Date) {
     return date.getFullYear() === other.getFullYear() && date.getMonth() === other.getMonth() && date.getDate() === other.getDate();
+  }
+
+  function statusLabelForKind(kind: number) {
+    if (kind === GIT_STATUS_OPEN_KIND) return 'open';
+    if (kind === GIT_STATUS_APPLIED_KIND) return 'applied';
+    if (kind === GIT_STATUS_CLOSED_KIND) return 'closed';
+    if (kind === GIT_STATUS_DRAFT_KIND) return 'draft';
+    return undefined;
+  }
+
+  function statusClassForKind(kind: number) {
+    if (kind === GIT_STATUS_OPEN_KIND) return 'status-open';
+    if (kind === GIT_STATUS_APPLIED_KIND) return 'status-applied';
+    if (kind === GIT_STATUS_CLOSED_KIND) return 'status-closed';
+    if (kind === GIT_STATUS_DRAFT_KIND) return 'status-draft';
+    return '';
   }
 
   function filterHashtag(tag: string) {
@@ -688,6 +707,9 @@ import {
                 <span class="git-label">{label}</span>
               {/each}
             </div>
+          {/if}
+          {#if gitStatusLabel}
+            <span class="git-status {gitStatusClass}">{gitStatusLabel}</span>
           {/if}
           {#if displayEvent.kind === 30617}
             <GitRepoPanel event={displayEvent} />

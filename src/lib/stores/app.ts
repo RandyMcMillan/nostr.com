@@ -153,6 +153,7 @@ export const likedEvents = writable<Set<string>>(new Set());
 export const repostedEvents = writable<Set<string>>(new Set());
 export const deletedEventIds = writable<Set<string>>(new Set());
 export const editedEvents = writable<Record<string, NostrEvent>>({});
+export const gitLatestStatus = writable<Record<string, NostrEvent>>({});
 export const loadingFeed = writable(false);
 export const loadingNewerFeed = writable(false);
 export const loadingMessages = writable(false);
@@ -661,12 +662,27 @@ async function restartVisibleStatsSubscription() {
   }).catch(() => undefined);
 }
 
+function updateGitLatestStatus(ids: string[], event: NostrEvent) {
+  if (!isGitStatusKind(event.kind)) return;
+  const current = get(gitLatestStatus);
+  let changed = false;
+  for (const id of ids) {
+    const existing = current[id];
+    if (!existing || event.created_at > existing.created_at || (event.created_at === existing.created_at && event.id > existing.id)) {
+      current[id] = event;
+      changed = true;
+    }
+  }
+  if (changed) gitLatestStatus.set({ ...current });
+}
+
 function mergeLiveStatEvent(ids: string[], event: NostrEvent) {
   if (event.kind === 5) {
     applyDeletionRequest(event);
     return;
   }
   const targetIds = statTargetIdsForLocalUse(event, ids);
+  updateGitLatestStatus(targetIds, event);
   if (currentSessionValue?.pubkey === event.pubkey) mergeOwnActionEvent(event, targetIds);
   if (event.kind === 7 && targetIds.every((id) => seenLiveReactionAuthors.has(`${id}:${event.pubkey}`))) return;
   if ((event.kind === 6 || event.kind === 16) && targetIds.every((id) => seenLiveRepostAuthors.has(`${id}:${event.pubkey}`))) return;
@@ -1100,6 +1116,9 @@ async function hydrateCachedEventStats(ids: string[]) {
   cachedStatsEventsPromise ??= getCachedEvents(2000).then((events) => events.filter((event) => [1, 6, 7, 16, 9735, ...GIT_THREAD_REPLY_KINDS].includes(event.kind)));
   const cachedEvents = await cachedStatsEventsPromise.catch(() => []);
   if (!cachedEvents.length) return;
+  for (const event of cachedEvents) {
+    if (isGitStatusKind(event.kind)) updateGitLatestStatus(statTargetIdsForLocalUse(event, ids), event);
+  }
   const cachedStats = eventStatsFromEvents(ids, cachedEvents);
   eventStats.update((existing) => {
     const merged = mergeStats(existing, cachedStats);
