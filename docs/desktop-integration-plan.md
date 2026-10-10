@@ -42,6 +42,8 @@ The following operations have been wired behind the `window.nostrGit` bridge and
 - ✅ `tag` create/list/delete
 - ✅ `reset` soft/mixed/hard
 - ✅ `fetch` / `pull` / `push` buttons
+- ✅ `cherry-pick` with abort support
+- ✅ `remote` add/list/remove
 
 Still to port:
 
