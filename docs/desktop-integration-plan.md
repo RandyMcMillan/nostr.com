@@ -35,7 +35,7 @@ Reuse the battle-tested, `dugite`-based Git layer from the GitHub Desktop fork a
 - Documented the interface boundaries in this file.
 - Removed unused release and pages workflows so CI is focused.
 
-### Phase 1 – Port selected operations (in progress)
+### Phase 1 – Port selected operations (complete)
 
 The following operations have been wired behind the `window.nostrGit` bridge and exposed in the repo panel UI:
 
@@ -49,11 +49,13 @@ The following operations have been wired behind the `window.nostrGit` bridge and
 - ✅ `worktree` add / list / remove
 - ✅ `rebase` with continue / abort / skip
 
-Phase 1 operations are complete. Phase 2 and beyond remain future work.
+### Phase 2 – Improve the Git runner (in progress)
 
-### Phase 2 – Improve the Git runner
-
-- `electron/git/core.cjs` already uses `dugite`; align error classification and parsing with `desktop/app/src/lib/git/core.ts`.
+- Align `electron/git/core.cjs` error classification and parsing with `desktop/app/src/lib/git/core.ts`.
+  - ✅ Expanded `getDescriptionForError` to cover all `dugite` `GitError` values.
+  - ✅ Added `expectedErrors` support so callers can opt-in to non-zero/parsed errors.
+  - ✅ Added `isAuthFailureError` helper.
+  - ✅ Added `electron/git/core.test.mjs` covering success exit codes, parsed errors, expected errors, and auth classification.
 - Migrate parsing logic (status, diff, log, refs) to desktop's parsers for consistency and better error messages.
 - Keep the IPC payload contracts stable so `src/lib/nativeGit.ts` needs only additive changes.
 
