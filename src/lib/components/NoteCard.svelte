@@ -255,7 +255,11 @@ import {
   }
 
   function threadRootId(note: NostrEvent) {
-    if (isGitRootKind(note.kind)) return note.id;
+    if (isGitRootKind(note.kind)) {
+      const rootTag = note.tags.find((tag) => tag[0] === 'e' && tag[1] && tag[3] === 'root');
+      if (rootTag?.[1]) return rootTag[1];
+      return note.id;
+    }
     if (note.kind === COMMENT_KIND || GIT_STATUS_KINDS.includes(note.kind)) {
       const rootTag = note.tags.find((tag) => (tag[0] === 'E' || tag[0] === 'A') && tag[1]);
       if (rootTag?.[1]) return rootTag[1];

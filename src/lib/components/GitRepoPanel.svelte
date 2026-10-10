@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { FolderOpen, GitBranch, GitCommit, HardDrive, Loader2, MessageSquare, GitPullRequest, FileDiff } from '@lucide/svelte';
   import type { NostrEvent } from '$lib/nostr/types';
-  import { GIT_REPO_KIND, GIT_PR_KIND } from '$lib/nostr/kinds';
+  import { GIT_REPO_KIND, GIT_PR_KIND, GIT_PATCH_KIND } from '$lib/nostr/kinds';
   import {
     isGitBridgeAvailable,
     cloneRepo,
@@ -54,6 +54,7 @@
   let patchTargetBranch = '';
   let patchPublishing = false;
   let patchError = '';
+  let patchParentEvent: NostrEvent | null = null;
   let prUpdateOpen = false;
   let prUpdatePublishing = false;
   let prUpdateError = '';
@@ -63,6 +64,11 @@
     (event) =>
       event.kind === GIT_PR_KIND &&
       event.pubkey === $session?.pubkey &&
+      event.tags.some((tag) => tag[0] === 'a' && tag[1] === address)
+  );
+  $: existingPatches = $events.filter(
+    (event) =>
+      event.kind === GIT_PATCH_KIND &&
       event.tags.some((tag) => tag[0] === 'a' && tag[1] === address)
   );
   $: entry = $gitRepoByAddress.get(address);
@@ -289,6 +295,7 @@
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
+    patchParentEvent = null;
     patchOpen = true;
   }
 
@@ -321,11 +328,13 @@
         patch,
         tipCommit: tip.sha,
         parentCommit: tip.parents[0] ?? '',
-        repoRelays
+        repoRelays,
+        parentPatchEvent: patchParentEvent ?? undefined
       });
       patchPublishing = false;
       patchOpen = false;
       patchTargetBranch = defaultBranch || 'main';
+      patchParentEvent = null;
     } catch (err) {
       patchPublishing = false;
       patchError = err instanceof Error ? err.message : 'Could not publish patch.';
@@ -473,6 +482,17 @@
             <input type="text" bind:value={patchTargetBranch} placeholder="main" />
           </label>
           <p class="git-description">Publishes commits between origin/{patchTargetBranch} and HEAD as a kind 1617 patch.</p>
+          {#if existingPatches.length}
+            <label>
+              Thread on previous patch (optional)
+              <select bind:value={patchParentEvent}>
+                <option value={null}>None (start a new series)</option>
+                {#each existingPatches as patch (patch.id)}
+                  <option value={patch}>{patch.tags.find((tag) => tag[0] === 'commit')?.[1]?.slice(0, 8) ?? patch.id.slice(0, 8)}</option>
+                {/each}
+              </select>
+            </label>
+          {/if}
           {#if patchError}<p class="error">{patchError}</p>{/if}
           <div class="dialog-actions">
             <button disabled={patchPublishing} on:click={() => (patchOpen = false)}>Cancel</button>

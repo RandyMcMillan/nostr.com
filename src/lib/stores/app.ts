@@ -1672,6 +1672,7 @@ export interface GitPatchInput {
   parentCommit: string;
   earliestUniqueCommit?: string;
   repoRelays?: string[];
+  parentPatchEvent?: NostrEvent;
 }
 
 export async function publishGitRepoState(state: GitRepoState) {
@@ -1803,8 +1804,18 @@ export async function publishGitPatch(input: GitPatchInput) {
   const { GIT_PATCH_KIND } = await import('$lib/nostr/kinds');
   const aTag: string[] = ['a', `30617:${pubkey}:${identifier}`];
   if (input.repoRelays?.[0]) aTag.push(input.repoRelays[0]);
-  const tags: string[][] = [aTag, ['p', pubkey], ['t', 'root'], ['commit', input.tipCommit], ['parent-commit', input.parentCommit]];
+  const tags: string[][] = [aTag, ['p', pubkey], ['commit', input.tipCommit], ['parent-commit', input.parentCommit]];
   if (input.earliestUniqueCommit) tags.push(['r', input.earliestUniqueCommit]);
+
+  if (input.parentPatchEvent) {
+    const parentRootTag = input.parentPatchEvent.tags.find((tag) => tag[0] === 'e' && tag[1] && tag[3] === 'root');
+    const rootId = parentRootTag?.[1] ?? input.parentPatchEvent.id;
+    tags.push(['e', rootId, '', 'root']);
+    tags.push(['e', input.parentPatchEvent.id, '', 'reply']);
+    tags.push(['p', input.parentPatchEvent.pubkey]);
+  } else {
+    tags.push(['t', 'root']);
+  }
 
   const event = await signEvent(currentSession, GIT_PATCH_KIND, input.patch, tags);
   events.update((existing) => mergeEvents([event], existing));
