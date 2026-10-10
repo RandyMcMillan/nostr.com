@@ -81,15 +81,15 @@ ci: check test
 
 # Initialize the desktop submodule (only needed once after clone)
 desktop-submodule-init:
-    git submodule update --init --recursive vendor/desktop
+    git submodule update --init --recursive vendor/github-desktop
 
 # Update the desktop submodule to the latest commit on its tracked branch
 desktop-submodule-update:
-    git submodule update --remote vendor/desktop
+    git submodule update --remote vendor/github-desktop
 
 # Build the desktop Electron app from the submodule (useful for reference builds)
 desktop-build:
-    cd vendor/desktop && yarn build:prod
+    cd vendor/github-desktop && yarn build:prod
 
 # Show the desktop integration plan
 show-desktop-plan:

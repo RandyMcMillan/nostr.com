@@ -30,7 +30,7 @@ Reuse the battle-tested, `dugite`-based Git layer from the GitHub Desktop fork a
 
 ### Phase 0 – Submodule and build wiring (this commit)
 
-- Add `RandyMcMillan/desktop` as a git submodule at `vendor/desktop`.
+- Add `RandyMcMillan/desktop` as a git submodule at `vendor/github-desktop`.
 - Add `.justfile` recipes to init/update the submodule and to build desktop independently for reference.
 - Document the interface boundaries in this file.
 
