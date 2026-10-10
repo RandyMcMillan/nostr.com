@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { FolderOpen, GitBranch, GitCommit, HardDrive, Loader2, MessageSquare, GitPullRequest, FileDiff } from '@lucide/svelte';
   import type { NostrEvent } from '$lib/nostr/types';
-  import { GIT_REPO_KIND } from '$lib/nostr/kinds';
+  import { GIT_REPO_KIND, GIT_PR_KIND } from '$lib/nostr/kinds';
   import {
     isGitBridgeAvailable,
     cloneRepo,
@@ -20,7 +20,7 @@
     type GitRemote
   } from '$lib/nativeGit';
   import { repoAddress, gitRepoByAddress } from '$lib/stores/gitRepos';
-  import { publishGitIssue, publishGitPullRequest, publishGitPatch } from '$lib/stores/app';
+  import { events, publishGitIssue, publishGitPullRequest, publishGitPullRequestUpdate, publishGitPatch, session } from '$lib/stores/app';
 
   export let event: NostrEvent;
 
@@ -54,8 +54,17 @@
   let patchTargetBranch = '';
   let patchPublishing = false;
   let patchError = '';
+  let prUpdateOpen = false;
+  let prUpdatePublishing = false;
+  let prUpdateError = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
+  $: existingPrs = $events.filter(
+    (event) =>
+      event.kind === GIT_PR_KIND &&
+      event.pubkey === $session?.pubkey &&
+      event.tags.some((tag) => tag[0] === 'a' && tag[1] === address)
+  );
   $: entry = $gitRepoByAddress.get(address);
   $: hasBridge = isGitBridgeAvailable();
 
@@ -250,6 +259,33 @@
     }
   }
 
+  async function updatePr(prEvent: NostrEvent) {
+    if (!entry?.localPath) return;
+    const branch = status?.branch || '';
+    const tip = commits[0]?.sha;
+    if (!tip) {
+      prUpdateError = 'Could not determine current tip commit.';
+      return;
+    }
+    prUpdatePublishing = true;
+    prUpdateError = '';
+    try {
+      await publishGitPullRequestUpdate({
+        repoAddress: address,
+        prEvent,
+        tipCommit: tip,
+        cloneUrls: prRemotes.map((remote) => remote.url),
+        branchName: branch,
+        repoRelays
+      });
+      prUpdatePublishing = false;
+      prUpdateOpen = false;
+    } catch (err) {
+      prUpdatePublishing = false;
+      prUpdateError = err instanceof Error ? err.message : 'Could not update pull request.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -306,6 +342,9 @@
           <GitCommit size={14} /> {expanded ? 'Hide' : 'Details'}
         </button>
         <button class="git-button" on:click={openPr} disabled={busy}><GitPullRequest size={14} /> New PR</button>
+        {#if existingPrs.length}
+          <button class="git-button" on:click={() => (prUpdateOpen = true)} disabled={busy}><GitPullRequest size={14} /> Update PR</button>
+        {/if}
         <button class="git-button" on:click={openPatch} disabled={busy}><FileDiff size={14} /> New patch</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
@@ -440,6 +479,39 @@
             <button class="primary" disabled={patchPublishing || !patchTargetBranch.trim()} on:click={publishPatch}>
               {patchPublishing ? 'Publishing...' : 'Publish'}
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if prUpdateOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !prUpdatePublishing && (prUpdateOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="pr-update-title">
+        <div class="dialog-head">
+          <h2 id="pr-update-title">Update pull request</h2>
+          <button class="icon-button small" aria-label="Close" disabled={prUpdatePublishing} on:click={() => (prUpdateOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <p class="git-description">Select a pull request to update to the current branch tip <code>{commits[0]?.shortSha ?? ''}</code>.</p>
+          {#if existingPrs.length}
+            <ul class="git-pr-list">
+              {#each existingPrs as pr (pr.id)}
+                <li>
+                  <span class="git-pr-subject">{pr.tags.find((tag) => tag[0] === 'subject')?.[1] ?? 'Untitled'}</span>
+                  <span class="git-pr-meta">{pr.tags.find((tag) => tag[0] === 'branch-name')?.[1] ?? ''}</span>
+                  <button class="git-button" disabled={prUpdatePublishing} on:click={() => updatePr(pr)}>
+                    {prUpdatePublishing ? 'Updating...' : 'Update'}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="git-empty">No existing pull requests found.</p>
+          {/if}
+          {#if prUpdateError}<p class="error">{prUpdateError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={prUpdatePublishing} on:click={() => (prUpdateOpen = false)}>Cancel</button>
           </div>
         </div>
       </div>

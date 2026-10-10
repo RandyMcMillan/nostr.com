@@ -1655,6 +1655,16 @@ export interface GitPullRequestInput {
   repoRelays?: string[];
 }
 
+export interface GitPullRequestUpdateInput {
+  repoAddress: string;
+  prEvent: NostrEvent;
+  tipCommit: string;
+  cloneUrls?: string[];
+  branchName?: string;
+  content?: string;
+  repoRelays?: string[];
+}
+
 export interface GitPatchInput {
   repoAddress: string;
   patch: string;
@@ -1742,6 +1752,38 @@ export async function publishGitPullRequest(input: GitPullRequestInput) {
   }
 
   const event = await signEvent(currentSession, GIT_PR_KIND, input.content, tags);
+  events.update((existing) => mergeEvents([event], existing));
+  void cacheEvents([event]);
+  enqueuePublish(event, input.repoRelays);
+  return event;
+}
+
+export async function publishGitPullRequestUpdate(input: GitPullRequestUpdateInput) {
+  const currentSession = get(session);
+  if (!currentSession) throw new Error('Sign in before publishing.');
+
+  const parts = input.repoAddress.split(':');
+  if (parts.length < 3) throw new Error('Invalid repository address.');
+  const [kind, pubkey, ...identifierParts] = parts;
+  if (Number(kind) !== 30617) throw new Error('Not a repository announcement address.');
+  const identifier = identifierParts.join(':');
+
+  const { GIT_PR_UPDATE_KIND } = await import('$lib/nostr/kinds');
+  const aTag: string[] = ['a', `30617:${pubkey}:${identifier}`];
+  if (input.repoRelays?.[0]) aTag.push(input.repoRelays[0]);
+  const tags: string[][] = [
+    aTag,
+    ['e', input.prEvent.id, '', 'root'],
+    ['p', input.prEvent.pubkey],
+    ['p', pubkey],
+    ['c', input.tipCommit]
+  ];
+  for (const url of input.cloneUrls ?? []) {
+    if (url) tags.push(['clone', url]);
+  }
+  if (input.branchName) tags.push(['branch-name', input.branchName]);
+
+  const event = await signEvent(currentSession, GIT_PR_UPDATE_KIND, input.content ?? '', tags);
   events.update((existing) => mergeEvents([event], existing));
   void cacheEvents([event]);
   enqueuePublish(event, input.repoRelays);

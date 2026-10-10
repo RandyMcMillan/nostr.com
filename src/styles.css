@@ -1684,6 +1684,34 @@ label span, label strong { color: var(--text); }
   color: var(--muted);
   font-size: 13px;
 }
+.git-pr-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.git-pr-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface) 82%, var(--text) 4%);
+}
+.git-pr-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.git-pr-meta {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
 .repo-list {
   display: grid;
   gap: 10px;
