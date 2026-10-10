@@ -44,6 +44,7 @@ The following operations have been wired behind the `window.nostrGit` bridge and
 - ✅ `fetch` / `pull` / `push` buttons
 - ✅ `cherry-pick` with abort support
 - ✅ `remote` add/list/remove
+- ✅ `stash` create/pop/drop/list
 
 Still to port:
 
