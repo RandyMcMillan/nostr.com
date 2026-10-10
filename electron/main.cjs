@@ -35,6 +35,8 @@ const {
   createStash,
   popStash,
   dropStash,
+  updateSubmodules,
+  listSubmodules,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -705,6 +707,28 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not drop stash.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:submodules', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      const submodules = await listSubmodules(localPath);
+      return { ok: true, submodules };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not list submodules.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:update-submodules', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await updateSubmodules(localPath, { force: payload?.force === true });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not update submodules.' };
     }
   });
 

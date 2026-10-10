@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld('nostrGit', {
   createStash: (payload) => ipcRenderer.invoke('nostr-git:create-stash', payload),
   popStash: (payload) => ipcRenderer.invoke('nostr-git:pop-stash', payload),
   dropStash: (payload) => ipcRenderer.invoke('nostr-git:drop-stash', payload),
+  submodules: (payload) => ipcRenderer.invoke('nostr-git:submodules', payload),
+  updateSubmodules: (payload) => ipcRenderer.invoke('nostr-git:update-submodules', payload),
   clone: (payload) => ipcRenderer.invoke('nostr-git:clone', payload),
   init: (payload) => ipcRenderer.invoke('nostr-git:init', payload),
   remove: (payload) => ipcRenderer.invoke('nostr-git:remove', payload),

@@ -69,6 +69,8 @@ interface NostrGitBridge {
   createStash: (payload: { localPath: string; message?: string }) => Promise<{ ok: boolean; error?: string }>;
   popStash: (payload: { localPath: string; ref?: string }) => Promise<{ ok: boolean; error?: string }>;
   dropStash: (payload: { localPath: string; ref: string }) => Promise<{ ok: boolean; error?: string }>;
+  submodules: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; submodules?: { sha: string; path: string; active: boolean }[] }>;
+  updateSubmodules: (payload: { localPath: string; force?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -282,6 +284,15 @@ export async function popRepoStash(localPath: string, ref?: string): Promise<{ o
 
 export async function dropRepoStash(localPath: string, ref: string): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.dropStash({ localPath, ref })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function getRepoSubmodules(localPath: string): Promise<{ sha: string; path: string; active: boolean }[]> {
+  const result = await bridge()?.submodules({ localPath });
+  return result?.ok && Array.isArray(result.submodules) ? result.submodules : [];
+}
+
+export async function updateRepoSubmodules(localPath: string, force = false): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.updateSubmodules({ localPath, force })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export function onCloneProgress(callback: (data: { address: string; text: string }) => void): () => void {

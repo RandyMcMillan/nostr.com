@@ -29,6 +29,8 @@
     createRepoStash,
     popRepoStash,
     dropRepoStash,
+    getRepoSubmodules,
+    updateRepoSubmodules,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
@@ -98,6 +100,7 @@
   let stashMessage = '';
   let stashPublishing = false;
   let stashError = '';
+  let submodules: { sha: string; path: string; active: boolean }[] = [];
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: existingPrs = $events.filter(
@@ -128,12 +131,13 @@
     if (!entry?.localPath) return;
     error = '';
     try {
-      [status, commits, tags, prRemotes, stashes] = await Promise.all([
+      [status, commits, tags, prRemotes, stashes, submodules] = await Promise.all([
         getRepoStatus(entry.localPath),
         getRepoLog(entry.localPath, 10),
         getRepoTags(entry.localPath),
         getRepoRemotes(entry.localPath),
-        getRepoStashes(entry.localPath)
+        getRepoStashes(entry.localPath),
+        getRepoSubmodules(entry.localPath)
       ]);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Could not load repo details.';
@@ -602,6 +606,25 @@
     }
   }
 
+  async function updateSubmodules() {
+    if (!entry?.localPath) return;
+    busy = true;
+    error = '';
+    try {
+      const result = await updateRepoSubmodules(entry.localPath);
+      busy = false;
+      if (result.ok) {
+        message = 'Submodules updated';
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Could not update submodules.';
+      }
+    } catch (err) {
+      busy = false;
+      error = err instanceof Error ? err.message : 'Could not update submodules.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -673,6 +696,7 @@
         <button class="git-button" on:click={openReset} disabled={busy}>Reset</button>
         <button class="git-button" on:click={openRemote} disabled={busy}>Remote</button>
         <button class="git-button" on:click={openStash} disabled={busy}>Stash</button>
+        <button class="git-button" on:click={updateSubmodules} disabled={busy}>Submodules</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
         {#if cloneUrls.length}
@@ -756,6 +780,20 @@
                     <button class="git-button small" on:click={() => applyStash(stash.ref)}>Pop</button>
                     <button class="icon-button small" aria-label="Drop stash" on:click={() => discardStash(stash.ref)}>×</button>
                   </span>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+        {#if submodules.length}
+          <div class="git-submodules">
+            <h4>Submodules</h4>
+            <ul>
+              {#each submodules as submodule (submodule.path)}
+                <li>
+                  <code>{submodule.sha.slice(0, 7)}</code>
+                  <span class="git-submodule-path">{submodule.path}</span>
+                  <span class="git-submodule-status">{submodule.active ? 'active' : 'inactive'}</span>
                 </li>
               {/each}
             </ul>
