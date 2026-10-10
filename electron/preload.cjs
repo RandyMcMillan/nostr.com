@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('nostrGit', {
   tags: (payload) => ipcRenderer.invoke('nostr-git:tags', payload),
   createTag: (payload) => ipcRenderer.invoke('nostr-git:create-tag', payload),
   deleteTag: (payload) => ipcRenderer.invoke('nostr-git:delete-tag', payload),
+  reset: (payload) => ipcRenderer.invoke('nostr-git:reset', payload),
   clone: (payload) => ipcRenderer.invoke('nostr-git:clone', payload),
   init: (payload) => ipcRenderer.invoke('nostr-git:init', payload),
   remove: (payload) => ipcRenderer.invoke('nostr-git:remove', payload),

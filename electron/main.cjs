@@ -26,6 +26,7 @@ const {
   getTags,
   createTag,
   deleteTag,
+  resetRepo,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -588,6 +589,19 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not delete tag.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:reset', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const mode = typeof payload?.mode === 'string' ? payload.mode : 'mixed';
+    const ref = typeof payload?.ref === 'string' ? payload.ref : '';
+    if (!localPath || !ref) return { ok: false, error: 'Missing local path or target ref.' };
+    try {
+      await resetRepo(localPath, mode, ref);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not reset.' };
     }
   });
 

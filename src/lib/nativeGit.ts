@@ -60,6 +60,7 @@ interface NostrGitBridge {
   tags: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; tags?: { name: string; commitSha: string }[] }>;
   createTag: (payload: { localPath: string; name: string; targetCommitSha: string }) => Promise<{ ok: boolean; error?: string }>;
   deleteTag: (payload: { localPath: string; name: string }) => Promise<{ ok: boolean; error?: string }>;
+  reset: (payload: { localPath: string; mode: 'soft' | 'mixed' | 'hard'; ref: string }) => Promise<{ ok: boolean; error?: string }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -232,6 +233,14 @@ export async function createRepoTag(
 
 export async function deleteRepoTag(localPath: string, name: string): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.deleteTag({ localPath, name })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function resetRepo(
+  localPath: string,
+  mode: 'soft' | 'mixed' | 'hard',
+  ref: string
+): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.reset({ localPath, mode, ref })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export function onCloneProgress(callback: (data: { address: string; text: string }) => void): () => void {

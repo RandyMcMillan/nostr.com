@@ -17,6 +17,7 @@
     getRepoTags,
     createRepoTag,
     deleteRepoTag,
+    resetRepo,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
@@ -67,6 +68,11 @@
   let tagTarget = '';
   let tagPublishing = false;
   let tagError = '';
+  let resetOpen = false;
+  let resetMode: 'soft' | 'mixed' | 'hard' = 'mixed';
+  let resetRef = '';
+  let resetPublishing = false;
+  let resetError = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: existingPrs = $events.filter(
@@ -345,6 +351,33 @@
     }
   }
 
+  function openReset() {
+    resetMode = 'mixed';
+    resetRef = commits[0]?.sha ?? '';
+    resetError = '';
+    resetOpen = true;
+  }
+
+  async function publishReset() {
+    if (!entry?.localPath || !resetRef.trim()) return;
+    resetPublishing = true;
+    resetError = '';
+    try {
+      const result = await resetRepo(entry.localPath, resetMode, resetRef.trim());
+      resetPublishing = false;
+      if (result.ok) {
+        resetOpen = false;
+        resetRef = '';
+        await loadRepoDetails();
+      } else {
+        resetError = result.error || 'Could not reset.';
+      }
+    } catch (err) {
+      resetPublishing = false;
+      resetError = err instanceof Error ? err.message : 'Could not reset.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -409,6 +442,7 @@
         {/if}
         <button class="git-button" on:click={openPatch} disabled={busy}><FileDiff size={14} /> New patch</button>
         <button class="git-button" on:click={openTag} disabled={busy}><Tag size={14} /> Tag</button>
+        <button class="git-button" on:click={openReset} disabled={busy}>Reset</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
         {#if cloneUrls.length}
@@ -627,6 +661,39 @@
             <button disabled={tagPublishing} on:click={() => (tagOpen = false)}>Cancel</button>
             <button class="primary" disabled={tagPublishing || !tagName.trim() || !tagTarget.trim()} on:click={publishTag}>
               {tagPublishing ? 'Creating...' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if resetOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !resetPublishing && (resetOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="reset-repo-title">
+        <div class="dialog-head">
+          <h2 id="reset-repo-title">Reset branch</h2>
+          <button class="icon-button small" aria-label="Close" disabled={resetPublishing} on:click={() => (resetOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <p class="git-description warning">This can discard local changes. Use with care.</p>
+          <label>
+            Mode
+            <select bind:value={resetMode}>
+              <option value="soft">Soft (keep changes staged)</option>
+              <option value="mixed">Mixed (keep changes unstaged)</option>
+              <option value="hard">Hard (discard changes)</option>
+            </select>
+          </label>
+          <label>
+            Target commit / ref
+            <input type="text" bind:value={resetRef} placeholder={commits[0]?.sha ?? 'HEAD~1'} />
+          </label>
+          {#if resetError}<p class="error">{resetError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={resetPublishing} on:click={() => (resetOpen = false)}>Cancel</button>
+            <button class="primary" disabled={resetPublishing || !resetRef.trim()} on:click={publishReset}>
+              {resetPublishing ? 'Resetting...' : 'Reset'}
             </button>
           </div>
         </div>
