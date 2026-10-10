@@ -50,6 +50,7 @@
   let expandedRepos = new Set<string>();
   let selectedFile: Record<string, string> = {};
   let fileDiffs = new Map<string, string>();
+  let hideWhitespace: Record<string, boolean> = {};
   let newBranchName: Record<string, string> = {};
 
   onMount(() => {
@@ -302,7 +303,11 @@
       fileDiffs = fileDiffs;
       return;
     }
-    const diff = await getRepoDiff(repo.localPath, file.path, isFileStaged(file));
+    const diff = await getRepoDiff(repo.localPath, {
+      filePath: file.path,
+      staged: isFileStaged(file),
+      hideWhitespace: hideWhitespace[repo.address]
+    });
     fileDiffs.set(key, diff || '(no diff)');
     fileDiffs = fileDiffs;
   }
@@ -317,6 +322,15 @@
     } else {
       await loadRepos();
     }
+  }
+
+  function setHideWhitespace(repo: GitRepoEntry, value: boolean) {
+    hideWhitespace[repo.address] = value;
+    hideWhitespace = hideWhitespace;
+    const selected = selectedFile[repo.address];
+    if (!selected) return;
+    const file = statuses.get(repo.address)?.files.find((f) => f.path === selected);
+    if (file) void selectFile(repo, file);
   }
 
   function statusLabel(repo: GitRepoEntry): string {
@@ -400,6 +414,14 @@
             </div>
             {#if expandedRepos.has(repo.address)}
               <div class="repo-file-list">
+                <label class="repo-hide-whitespace">
+                  <input
+                    type="checkbox"
+                    checked={hideWhitespace[repo.address]}
+                    on:change={(event) => setHideWhitespace(repo, event.currentTarget.checked)}
+                  />
+                  Hide whitespace
+                </label>
                 {#each statuses.get(repo.address)?.files ?? [] as file (file.path)}
                   <div class="repo-file-row" class:selected={selectedFile[repo.address] === file.path}>
                     <button class="file-stage" title={isFileStaged(file) ? 'Unstage' : 'Stage'} on:click={() => toggleStage(repo, file)}>

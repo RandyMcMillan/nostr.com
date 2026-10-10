@@ -529,7 +529,8 @@ function registerNostrGitHandlers() {
     try {
       const diff = await getDiff(localPath, {
         filePath: payload?.filePath,
-        staged: payload?.staged
+        staged: payload?.staged,
+        hideWhitespace: payload?.hideWhitespace
       });
       return { ok: true, diff };
     } catch (error) {

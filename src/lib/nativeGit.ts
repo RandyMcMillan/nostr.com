@@ -39,7 +39,7 @@ interface NostrGitBridge {
   deleteBranch: (payload: { localPath: string; branchName: string; force?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   commit: (payload: { localPath: string; message: string; allowEmpty?: boolean; authorName?: string; authorEmail?: string }) => Promise<{ ok: boolean; error?: string }>;
   push: (payload: { localPath: string; remote?: string; branch?: string; forceWithLease?: boolean }) => Promise<{ ok: boolean; error?: string }>;
-  diff: (payload: { localPath: string; filePath?: string; staged?: boolean }) => Promise<{ ok: boolean; error?: string; diff?: string }>;
+  diff: (payload: { localPath: string; filePath?: string; staged?: boolean; hideWhitespace?: boolean }) => Promise<{ ok: boolean; error?: string; diff?: string }>;
   stage: (payload: { localPath: string; filePath?: string }) => Promise<{ ok: boolean; error?: string }>;
   unstage: (payload: { localPath: string; filePath?: string }) => Promise<{ ok: boolean; error?: string }>;
   refs: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; refs?: GitRefs }>;
@@ -159,8 +159,11 @@ export async function pushRepo(localPath: string, remote?: string, branch?: stri
   return (await bridge()?.push({ localPath, remote, branch, forceWithLease })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
-export async function getRepoDiff(localPath: string, filePath?: string, staged = false): Promise<string> {
-  const result = await bridge()?.diff({ localPath, filePath, staged });
+export async function getRepoDiff(
+  localPath: string,
+  options: { filePath?: string; staged?: boolean; hideWhitespace?: boolean } = {}
+): Promise<string> {
+  const result = await bridge()?.diff({ localPath, ...options });
   return result?.ok && typeof result.diff === 'string' ? result.diff : '';
 }
 
