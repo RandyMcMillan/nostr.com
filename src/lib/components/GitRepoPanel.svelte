@@ -39,6 +39,7 @@
     abortRepoRebase,
     skipRepoRebase,
     onCloneProgress,
+    isAuthFailure,
     type GitStatus,
     type GitCommit as GitCommitInfo,
     type GitRemote
@@ -851,7 +852,14 @@
 
     {#if message}<span class="git-message">{message}</span>{/if}
     {#if progressText}<span class="git-message progress">{progressText}</span>{/if}
-    {#if error}<span class="git-error">{error}</span>{/if}
+    {#if error}
+      <span class="git-error">
+        {error}
+        {#if isAuthFailure(error)}
+          <span class="git-auth-hint">Check your credentials or remote access.</span>
+        {/if}
+      </span>
+    {/if}
 
     {#if expanded && entry}
       <div class="git-repo-details">

@@ -320,6 +320,10 @@ export async function skipRepoRebase(localPath: string): Promise<{ ok: boolean; 
   return (await bridge()?.skipRebase({ localPath })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
+export function isAuthFailure(message: string): boolean {
+  return /Authentication failed/i.test(message);
+}
+
 export function onCloneProgress(callback: (data: { address: string; text: string }) => void): () => void {
   if (!browser || !window.nostrGit?.onCloneProgress) {
     return () => {};
