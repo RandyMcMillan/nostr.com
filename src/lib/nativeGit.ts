@@ -1,39 +1,29 @@
 import { browser } from '$app/environment';
+import type {
+  GitRepoEntry,
+  GitStatusFile,
+  GitStatus,
+  GitCommit,
+  GitRemote,
+  GitRefs,
+  GitStash,
+  GitSubmodule,
+  GitWorktree,
+  GitTag
+} from './git-types';
 
-export interface GitRepoEntry {
-  address: string;
-  localPath: string;
-  updatedAt: number;
-  [key: string]: unknown;
-}
-
-export interface GitStatusFile {
-  index: string;
-  workingTree: string;
-  path: string;
-}
-
-export interface GitStatus {
-  exists: boolean;
-  branch: string | null;
-  ahead: number;
-  behind: number;
-  files: GitStatusFile[];
-}
-
-export interface GitCommit {
-  sha: string;
-  shortSha: string;
-  subject: string;
-  author: { name: string; email: string };
-  date: string;
-  parents: string[];
-}
-
-export interface GitRemote {
-  name: string;
-  url: string;
-}
+export type {
+  GitRepoEntry,
+  GitStatusFile,
+  GitStatus,
+  GitCommit,
+  GitRemote,
+  GitRefs,
+  GitStash,
+  GitSubmodule,
+  GitWorktree,
+  GitTag
+};
 
 interface NostrGitBridge {
   list: () => Promise<GitRepoEntry[]>;
@@ -52,26 +42,22 @@ interface NostrGitBridge {
   diff: (payload: { localPath: string; filePath?: string; staged?: boolean }) => Promise<{ ok: boolean; error?: string; diff?: string }>;
   stage: (payload: { localPath: string; filePath?: string }) => Promise<{ ok: boolean; error?: string }>;
   unstage: (payload: { localPath: string; filePath?: string }) => Promise<{ ok: boolean; error?: string }>;
-  refs: (payload: { localPath: string }) => Promise<{
-    ok: boolean;
-    error?: string;
-    refs?: { headBranch: string | null; branches: { name: string; commit: string }[]; tags: { name: string; commit: string }[] };
-  }>;
+  refs: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; refs?: GitRefs }>;
   mergeBase: (payload: { localPath: string; refA: string; refB: string }) => Promise<{ ok: boolean; error?: string; commit?: string }>;
   formatPatch: (payload: { localPath: string; baseRef?: string; single?: string }) => Promise<{ ok: boolean; error?: string; patch?: string }>;
-  tags: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; tags?: { name: string; commitSha: string }[] }>;
+  tags: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; tags?: GitTag[] }>;
   createTag: (payload: { localPath: string; name: string; targetCommitSha: string }) => Promise<{ ok: boolean; error?: string }>;
   deleteTag: (payload: { localPath: string; name: string }) => Promise<{ ok: boolean; error?: string }>;
   reset: (payload: { localPath: string; mode: 'soft' | 'mixed' | 'hard'; ref: string }) => Promise<{ ok: boolean; error?: string }>;
   cherryPick: (payload: { localPath: string; sha: string }) => Promise<{ ok: boolean; error?: string }>;
   abortCherryPick: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string }>;
-  stashes: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; stashes?: { sha: string; ref: string; message: string }[] }>;
+  stashes: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; stashes?: GitStash[] }>;
   createStash: (payload: { localPath: string; message?: string }) => Promise<{ ok: boolean; error?: string }>;
   popStash: (payload: { localPath: string; ref?: string }) => Promise<{ ok: boolean; error?: string }>;
   dropStash: (payload: { localPath: string; ref: string }) => Promise<{ ok: boolean; error?: string }>;
-  submodules: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; submodules?: { sha: string; path: string; active: boolean }[] }>;
+  submodules: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; submodules?: GitSubmodule[] }>;
   updateSubmodules: (payload: { localPath: string; force?: boolean }) => Promise<{ ok: boolean; error?: string }>;
-  worktrees: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; worktrees?: { path: string; head: string; branch: string | null; isDetached: boolean; main: boolean }[] }>;
+  worktrees: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; worktrees?: GitWorktree[] }>;
   addWorktree: (payload: { localPath: string; worktreePath: string; createBranch?: string; commitish?: string }) => Promise<{ ok: boolean; error?: string }>;
   removeWorktree: (payload: { localPath: string; worktreePath: string; force?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   rebase: (payload: { localPath: string; ref: string }) => Promise<{ ok: boolean; error?: string }>;
@@ -186,11 +172,7 @@ export async function unstageRepoFile(localPath: string, filePath?: string): Pro
   return (await bridge()?.unstage({ localPath, filePath })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
-export async function getRepoRefs(localPath: string): Promise<{
-  headBranch: string | null;
-  branches: { name: string; commit: string }[];
-  tags: { name: string; commit: string }[];
-}> {
+export async function getRepoRefs(localPath: string): Promise<GitRefs> {
   const result = await bridge()?.refs({ localPath });
   return result?.ok && result.refs
     ? result.refs
@@ -243,7 +225,7 @@ export async function chooseRepoFolder(): Promise<{ ok: boolean; error?: string;
   return (await bridge()?.chooseFolder()) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
-export async function getRepoTags(localPath: string): Promise<{ name: string; commitSha: string }[]> {
+export async function getRepoTags(localPath: string): Promise<GitTag[]> {
   const result = await bridge()?.tags({ localPath });
   return result?.ok && Array.isArray(result.tags) ? result.tags : [];
 }
@@ -276,7 +258,7 @@ export async function abortCherryPickRepo(localPath: string): Promise<{ ok: bool
   return (await bridge()?.abortCherryPick({ localPath })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
-export async function getRepoStashes(localPath: string): Promise<{ sha: string; ref: string; message: string }[]> {
+export async function getRepoStashes(localPath: string): Promise<GitStash[]> {
   const result = await bridge()?.stashes({ localPath });
   return result?.ok && Array.isArray(result.stashes) ? result.stashes : [];
 }
@@ -293,7 +275,7 @@ export async function dropRepoStash(localPath: string, ref: string): Promise<{ o
   return (await bridge()?.dropStash({ localPath, ref })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
-export async function getRepoSubmodules(localPath: string): Promise<{ sha: string; path: string; active: boolean }[]> {
+export async function getRepoSubmodules(localPath: string): Promise<GitSubmodule[]> {
   const result = await bridge()?.submodules({ localPath });
   return result?.ok && Array.isArray(result.submodules) ? result.submodules : [];
 }
@@ -302,7 +284,7 @@ export async function updateRepoSubmodules(localPath: string, force = false): Pr
   return (await bridge()?.updateSubmodules({ localPath, force })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
-export async function getRepoWorktrees(localPath: string): Promise<{ path: string; head: string; branch: string | null; isDetached: boolean; main: boolean }[]> {
+export async function getRepoWorktrees(localPath: string): Promise<GitWorktree[]> {
   const result = await bridge()?.worktrees({ localPath });
   return result?.ok && Array.isArray(result.worktrees) ? result.worktrees : [];
 }

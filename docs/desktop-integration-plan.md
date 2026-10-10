@@ -67,10 +67,12 @@ The following operations have been wired behind the `window.nostrGit` bridge and
   - ✅ Added `electron/git/refs.test.mjs` covering branches, tags, detached HEAD, ref formatting, and symbolic ref reading.
 - Keep the IPC payload contracts stable so `src/lib/nativeGit.ts` needs only additive changes.
 
-### Phase 3 – Shared types
+### Phase 3 – Shared types (complete)
 
-- Extract common Git types (status, diff, commit, branch, remote) into a small shared package or `src/lib/git-types.ts`.
-- Update both frontends to import from that source, reducing type drift.
+- ✅ Extracted common Git types into `src/lib/git-types.ts` (`GitRepoEntry`, `GitStatusFile`, `GitStatus`, `GitCommit`, `GitRemote`, `GitBranch`, `GitTag`, `GitRefs`, `GitStash`, `GitSubmodule`, `GitWorktree`).
+- ✅ Updated `src/lib/nativeGit.ts` to import and re-export shared types.
+- ✅ Updated `src/lib/stores/app.ts` (`GitRepoState`) and `src/routes/repos/+page.svelte` to use `GitRefs`.
+- ✅ Added `upstreamBranch` and `currentTip` to `GitStatus` to match the migrated status parser.
 
 ### Phase 4 – Optional unified packaging
 

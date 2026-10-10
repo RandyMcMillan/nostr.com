@@ -1627,13 +1627,11 @@ export async function publishGitRepo(announcement: GitRepoAnnouncement) {
   return event;
 }
 
+import type { GitRefs } from '$lib/git-types';
+
 export interface GitRepoState {
   address: string;
-  refs: {
-    headBranch: string | null;
-    branches: { name: string; commit: string }[];
-    tags: { name: string; commit: string }[];
-  };
+  refs: GitRefs;
 }
 
 export interface GitIssueInput {
@@ -1695,7 +1693,7 @@ export async function publishGitRepoState(state: GitRepoState) {
     tags.push([`refs/heads/${branch.name}`, branch.commit]);
   }
   for (const tag of state.refs.tags) {
-    tags.push([`refs/tags/${tag.name}`, tag.commit]);
+    tags.push([`refs/tags/${tag.name}`, tag.commitSha]);
   }
 
   const event = await signEvent(currentSession, GIT_REPO_STATE_KIND, '', tags);
