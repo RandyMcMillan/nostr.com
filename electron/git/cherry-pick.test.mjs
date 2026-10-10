@@ -18,6 +18,7 @@ describe('electron/git/cherry-pick', () => {
     fs.writeFileSync(path.join(tmpDir, 'a.txt'), 'a');
     await runGit(['add', 'a.txt'], tmpDir);
     await runGit(['commit', '-m', 'first'], tmpDir);
+    await runGit(['branch', '-m', 'main'], tmpDir);
 
     fs.writeFileSync(path.join(tmpDir, 'b.txt'), 'b');
     await runGit(['add', 'b.txt'], tmpDir);

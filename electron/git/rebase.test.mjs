@@ -18,6 +18,7 @@ describe('electron/git/rebase', () => {
     fs.writeFileSync(path.join(tmpDir, 'base.txt'), 'base');
     await runGit(['add', 'base.txt'], tmpDir);
     await runGit(['commit', '-m', 'base'], tmpDir);
+    await runGit(['branch', '-m', 'main'], tmpDir);
 
     await runGit(['checkout', '-b', 'feature'], tmpDir);
     fs.writeFileSync(path.join(tmpDir, 'feat.txt'), 'feat');
