@@ -40,6 +40,8 @@ interface NostrGitBridge {
   status: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; status?: GitStatus }>;
   log: (payload: { localPath: string; limit?: number }) => Promise<{ ok: boolean; error?: string; commits?: GitCommit[] }>;
   remotes: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; remotes?: GitRemote[] }>;
+  addRemote: (payload: { localPath: string; name: string; url: string }) => Promise<{ ok: boolean; error?: string; remote?: GitRemote }>;
+  removeRemote: (payload: { localPath: string; name: string }) => Promise<{ ok: boolean; error?: string }>;
   fetch: (payload: { localPath: string; remote?: string; prune?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   pull: (payload: { localPath: string; ffOnly?: boolean; rebase?: boolean }) => Promise<{ ok: boolean; error?: string }>;
   branches: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; branches?: { name: string; current: boolean }[] }>;
@@ -115,6 +117,14 @@ export async function getRepoLog(localPath: string, limit = 20): Promise<GitComm
 export async function getRepoRemotes(localPath: string): Promise<GitRemote[]> {
   const result = await bridge()?.remotes({ localPath });
   return result?.ok && result.remotes ? result.remotes : [];
+}
+
+export async function addRepoRemote(localPath: string, name: string, url: string): Promise<{ ok: boolean; error?: string; remote?: GitRemote }> {
+  return (await bridge()?.addRemote({ localPath, name, url })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function removeRepoRemote(localPath: string, name: string): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.removeRemote({ localPath, name })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export async function fetchRepo(localPath: string, remote?: string, prune = true): Promise<{ ok: boolean; error?: string }> {

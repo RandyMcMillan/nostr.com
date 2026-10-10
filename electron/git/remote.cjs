@@ -30,4 +30,8 @@ async function addRemote(repoPath, name, url) {
   return { name, url };
 }
 
-module.exports = { getRemotes, addRemote };
+async function removeRemote(repoPath, name) {
+  await runGit(['remote', 'remove', '--', name], repoPath);
+}
+
+module.exports = { getRemotes, addRemote, removeRemote };

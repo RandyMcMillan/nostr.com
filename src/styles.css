@@ -1744,6 +1744,39 @@ label span, label strong { color: var(--text); }
   gap: 4px;
   font-weight: 700;
 }
+.git-remotes {
+  display: grid;
+  gap: 8px;
+}
+.git-remotes h4 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.git-remotes ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.git-remotes li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.git-remote-name {
+  font-weight: 700;
+}
+.git-remote-url {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
 .repo-list {
   display: grid;
   gap: 10px;

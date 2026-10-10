@@ -4,7 +4,7 @@ const { spawnGit } = require('./spawn.cjs');
 const { cloneRepository } = require('./clone.cjs');
 const { getRepositoryStatus } = require('./status.cjs');
 const { getRepositoryLog } = require('./log.cjs');
-const { getRemotes, addRemote } = require('./remote.cjs');
+const { getRemotes, addRemote, removeRemote } = require('./remote.cjs');
 const { initRepository } = require('./init.cjs');
 const { fetchRepository } = require('./fetch.cjs');
 const { pullRepository } = require('./pull.cjs');
@@ -28,6 +28,7 @@ module.exports = {
   getRepositoryLog,
   getRemotes,
   addRemote,
+  removeRemote,
   initRepository,
   fetchRepository,
   pullRepository,

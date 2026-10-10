@@ -9,6 +9,8 @@ const {
   getRepositoryStatus,
   getRepositoryLog,
   getRemotes,
+  addRemote,
+  removeRemote,
   initRepository,
   fetchRepository,
   pullRepository,
@@ -391,6 +393,31 @@ function registerNostrGitHandlers() {
       return { ok: true, remotes };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not read remotes.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:add-remote', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const name = typeof payload?.name === 'string' ? payload.name : '';
+    const url = typeof payload?.url === 'string' ? payload.url : '';
+    if (!localPath || !name || !url) return { ok: false, error: 'Missing local path, remote name, or URL.' };
+    try {
+      const remote = await addRemote(localPath, name, url);
+      return { ok: true, remote };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not add remote.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:remove-remote', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const name = typeof payload?.name === 'string' ? payload.name : '';
+    if (!localPath || !name) return { ok: false, error: 'Missing local path or remote name.' };
+    try {
+      await removeRemote(localPath, name);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not remove remote.' };
     }
   });
 

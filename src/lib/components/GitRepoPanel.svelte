@@ -23,6 +23,8 @@
     pushRepo,
     cherryPickRepo,
     abortCherryPickRepo,
+    addRepoRemote,
+    removeRepoRemote,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
@@ -82,6 +84,11 @@
   let cherryPickSha = '';
   let cherryPickPublishing = false;
   let cherryPickError = '';
+  let remoteOpen = false;
+  let remoteName = '';
+  let remoteUrl = '';
+  let remotePublishing = false;
+  let remoteError = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: existingPrs = $events.filter(
@@ -112,10 +119,11 @@
     if (!entry?.localPath) return;
     error = '';
     try {
-      [status, commits, tags] = await Promise.all([
+      [status, commits, tags, prRemotes] = await Promise.all([
         getRepoStatus(entry.localPath),
         getRepoLog(entry.localPath, 10),
-        getRepoTags(entry.localPath)
+        getRepoTags(entry.localPath),
+        getRepoRemotes(entry.localPath)
       ]);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Could not load repo details.';
@@ -485,6 +493,49 @@
     }
   }
 
+  function openRemote() {
+    remoteName = '';
+    remoteUrl = '';
+    remoteError = '';
+    remoteOpen = true;
+  }
+
+  async function publishRemote() {
+    if (!entry?.localPath || !remoteName.trim() || !remoteUrl.trim()) return;
+    remotePublishing = true;
+    remoteError = '';
+    try {
+      const result = await addRepoRemote(entry.localPath, remoteName.trim(), remoteUrl.trim());
+      remotePublishing = false;
+      if (result.ok) {
+        remoteOpen = false;
+        remoteName = '';
+        remoteUrl = '';
+        prRemotes = await getRepoRemotes(entry.localPath);
+      } else {
+        remoteError = result.error || 'Could not add remote.';
+      }
+    } catch (err) {
+      remotePublishing = false;
+      remoteError = err instanceof Error ? err.message : 'Could not add remote.';
+    }
+  }
+
+  async function deleteRemote(name: string) {
+    if (!entry?.localPath) return;
+    error = '';
+    try {
+      const result = await removeRepoRemote(entry.localPath, name);
+      if (result.ok) {
+        prRemotes = await getRepoRemotes(entry.localPath);
+      } else {
+        error = result.error || 'Could not remove remote.';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Could not remove remote.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -554,6 +605,7 @@
         <button class="git-button" on:click={openTag} disabled={busy}><Tag size={14} /> Tag</button>
         <button class="git-button" on:click={openCherryPick} disabled={busy}>Cherry-pick</button>
         <button class="git-button" on:click={openReset} disabled={busy}>Reset</button>
+        <button class="git-button" on:click={openRemote} disabled={busy}>Remote</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
         {#if cloneUrls.length}
@@ -606,6 +658,20 @@
                   <span class="git-tag-name"><Tag size={12} /> {tag.name}</span>
                   <code>{tag.commitSha.slice(0, 7)}</code>
                   <button class="icon-button small" aria-label="Delete tag" on:click={() => removeTag(tag.name)}>×</button>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+        {#if prRemotes.length}
+          <div class="git-remotes">
+            <h4>Remotes</h4>
+            <ul>
+              {#each prRemotes as remote (remote.name)}
+                <li>
+                  <span class="git-remote-name">{remote.name}</span>
+                  <span class="git-remote-url">{remote.url}</span>
+                  <button class="icon-button small" aria-label="Remove remote" on:click={() => deleteRemote(remote.name)}>×</button>
                 </li>
               {/each}
             </ul>
@@ -830,6 +896,34 @@
             <button disabled={cherryPickPublishing} on:click={abortCherryPick}>Abort</button>
             <button class="primary" disabled={cherryPickPublishing || !cherryPickSha.trim()} on:click={publishCherryPick}>
               {cherryPickPublishing ? 'Applying...' : 'Cherry-pick'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if remoteOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !remotePublishing && (remoteOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="remote-repo-title">
+        <div class="dialog-head">
+          <h2 id="remote-repo-title">Add remote</h2>
+          <button class="icon-button small" aria-label="Close" disabled={remotePublishing} on:click={() => (remoteOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <label>
+            Name
+            <input type="text" bind:value={remoteName} placeholder="origin" />
+          </label>
+          <label>
+            URL
+            <input type="text" bind:value={remoteUrl} placeholder="https://github.com/user/repo.git" />
+          </label>
+          {#if remoteError}<p class="error">{remoteError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={remotePublishing} on:click={() => (remoteOpen = false)}>Cancel</button>
+            <button class="primary" disabled={remotePublishing || !remoteName.trim() || !remoteUrl.trim()} on:click={publishRemote}>
+              {remotePublishing ? 'Adding...' : 'Add'}
             </button>
           </div>
         </div>
