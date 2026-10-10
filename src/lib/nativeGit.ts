@@ -74,6 +74,10 @@ interface NostrGitBridge {
   worktrees: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string; worktrees?: { path: string; head: string; branch: string | null; isDetached: boolean; main: boolean }[] }>;
   addWorktree: (payload: { localPath: string; worktreePath: string; createBranch?: string; commitish?: string }) => Promise<{ ok: boolean; error?: string }>;
   removeWorktree: (payload: { localPath: string; worktreePath: string; force?: boolean }) => Promise<{ ok: boolean; error?: string }>;
+  rebase: (payload: { localPath: string; ref: string }) => Promise<{ ok: boolean; error?: string }>;
+  continueRebase: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string }>;
+  abortRebase: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string }>;
+  skipRebase: (payload: { localPath: string }) => Promise<{ ok: boolean; error?: string }>;
   clone: (payload: {
     kind: number;
     pubkey: string;
@@ -313,6 +317,22 @@ export async function addRepoWorktree(
 
 export async function removeRepoWorktree(localPath: string, worktreePath: string, force = false): Promise<{ ok: boolean; error?: string }> {
   return (await bridge()?.removeWorktree({ localPath, worktreePath, force })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function rebaseRepo(localPath: string, ref: string): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.rebase({ localPath, ref })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function continueRepoRebase(localPath: string): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.continueRebase({ localPath })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function abortRepoRebase(localPath: string): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.abortRebase({ localPath })) ?? { ok: false, error: 'Git bridge unavailable.' };
+}
+
+export async function skipRepoRebase(localPath: string): Promise<{ ok: boolean; error?: string }> {
+  return (await bridge()?.skipRebase({ localPath })) ?? { ok: false, error: 'Git bridge unavailable.' };
 }
 
 export function onCloneProgress(callback: (data: { address: string; text: string }) => void): () => void {

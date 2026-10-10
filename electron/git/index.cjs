@@ -20,6 +20,7 @@ const { cherryPick, abortCherryPick } = require('./cherry-pick.cjs');
 const { getStashes, createStash, popStash, dropStash } = require('./stash.cjs');
 const { updateSubmodules, listSubmodules } = require('./submodule.cjs');
 const { listWorktrees, addWorktree, removeWorktree } = require('./worktree.cjs');
+const { rebaseRepo, continueRebase, abortRebase, skipRebase } = require('./rebase.cjs');
 const store = require('./store.cjs');
 
 module.exports = {
@@ -61,5 +62,9 @@ module.exports = {
   listWorktrees,
   addWorktree,
   removeWorktree,
+  rebaseRepo,
+  continueRebase,
+  abortRebase,
+  skipRebase,
   store
 };

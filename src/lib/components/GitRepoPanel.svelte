@@ -34,6 +34,10 @@
     getRepoWorktrees,
     addRepoWorktree,
     removeRepoWorktree,
+    rebaseRepo,
+    continueRepoRebase,
+    abortRepoRebase,
+    skipRepoRebase,
     onCloneProgress,
     type GitStatus,
     type GitCommit as GitCommitInfo,
@@ -110,6 +114,10 @@
   let worktreeBranch = '';
   let worktreePublishing = false;
   let worktreeError = '';
+  let rebaseOpen = false;
+  let rebaseRef = '';
+  let rebasePublishing = false;
+  let rebaseError = '';
 
   $: address = repoAddress(GIT_REPO_KIND, event.pubkey, dTag);
   $: existingPrs = $events.filter(
@@ -680,6 +688,77 @@
     }
   }
 
+  function openRebase() {
+    rebaseRef = defaultBranch || 'main';
+    rebaseError = '';
+    rebaseOpen = true;
+  }
+
+  async function publishRebase() {
+    if (!entry?.localPath || !rebaseRef.trim()) return;
+    rebasePublishing = true;
+    rebaseError = '';
+    try {
+      const result = await rebaseRepo(entry.localPath, rebaseRef.trim());
+      rebasePublishing = false;
+      if (result.ok) {
+        rebaseOpen = false;
+        rebaseRef = '';
+        await loadRepoDetails();
+      } else {
+        rebaseError = result.error || 'Rebase failed.';
+      }
+    } catch (err) {
+      rebasePublishing = false;
+      rebaseError = err instanceof Error ? err.message : 'Rebase failed.';
+    }
+  }
+
+  async function continueRebase() {
+    if (!entry?.localPath) return;
+    error = '';
+    try {
+      const result = await continueRepoRebase(entry.localPath);
+      if (result.ok) {
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Could not continue rebase.';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Could not continue rebase.';
+    }
+  }
+
+  async function abortRebase() {
+    if (!entry?.localPath) return;
+    error = '';
+    try {
+      const result = await abortRepoRebase(entry.localPath);
+      if (result.ok) {
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Could not abort rebase.';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Could not abort rebase.';
+    }
+  }
+
+  async function skipRebase() {
+    if (!entry?.localPath) return;
+    error = '';
+    try {
+      const result = await skipRepoRebase(entry.localPath);
+      if (result.ok) {
+        await loadRepoDetails();
+      } else {
+        error = result.error || 'Could not skip rebase commit.';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Could not skip rebase commit.';
+    }
+  }
+
   function openPatch() {
     patchTargetBranch = defaultBranch || 'main';
     patchError = '';
@@ -753,6 +832,7 @@
         <button class="git-button" on:click={openStash} disabled={busy}>Stash</button>
         <button class="git-button" on:click={updateSubmodules} disabled={busy}>Submodules</button>
         <button class="git-button" on:click={openWorktree} disabled={busy}>Worktree</button>
+        <button class="git-button" on:click={openRebase} disabled={busy}>Rebase</button>
         <button class="git-button" on:click={forget} disabled={busy}>Forget</button>
       {:else}
         {#if cloneUrls.length}
@@ -1171,6 +1251,32 @@
             <button disabled={worktreePublishing} on:click={() => (worktreeOpen = false)}>Cancel</button>
             <button class="primary" disabled={worktreePublishing || !worktreePath.trim()} on:click={publishWorktree}>
               {worktreePublishing ? 'Adding...' : 'Add'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if rebaseOpen}
+    <div class="dialog-backdrop" role="presentation" tabindex="-1" on:click={(event) => event.target === event.currentTarget && !rebasePublishing && (rebaseOpen = false)}>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="rebase-repo-title">
+        <div class="dialog-head">
+          <h2 id="rebase-repo-title">Rebase</h2>
+          <button class="icon-button small" aria-label="Close" disabled={rebasePublishing} on:click={() => (rebaseOpen = false)}>×</button>
+        </div>
+        <div class="profile-editor">
+          <label>
+            Target ref
+            <input type="text" bind:value={rebaseRef} placeholder="main" />
+          </label>
+          {#if rebaseError}<p class="error">{rebaseError}</p>{/if}
+          <div class="dialog-actions">
+            <button disabled={rebasePublishing} on:click={() => (rebaseOpen = false)}>Cancel</button>
+            <button disabled={rebasePublishing} on:click={abortRebase}>Abort</button>
+            <button disabled={rebasePublishing} on:click={continueRebase}>Continue</button>
+            <button class="primary" disabled={rebasePublishing || !rebaseRef.trim()} on:click={publishRebase}>
+              {rebasePublishing ? 'Rebasing...' : 'Rebase'}
             </button>
           </div>
         </div>

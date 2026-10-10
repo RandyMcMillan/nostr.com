@@ -40,6 +40,10 @@ const {
   listWorktrees,
   addWorktree,
   removeWorktree,
+  rebaseRepo,
+  continueRebase,
+  abortRebase,
+  skipRebase,
   store: gitStore
 } = require('./git/index.cjs');
 
@@ -770,6 +774,51 @@ function registerNostrGitHandlers() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error?.message || 'Could not remove worktree.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:rebase', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    const ref = typeof payload?.ref === 'string' ? payload.ref : '';
+    if (!localPath || !ref) return { ok: false, error: 'Missing local path or target ref.' };
+    try {
+      await rebaseRepo(localPath, ref);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Rebase failed.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:continue-rebase', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await continueRebase(localPath);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not continue rebase.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:abort-rebase', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await abortRebase(localPath);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not abort rebase.' };
+    }
+  });
+
+  ipcMain.handle('nostr-git:skip-rebase', async (_event, payload) => {
+    const localPath = typeof payload?.localPath === 'string' ? payload.localPath : '';
+    if (!localPath) return { ok: false, error: 'Missing local path.' };
+    try {
+      await skipRebase(localPath);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Could not skip rebase commit.' };
     }
   });
 
