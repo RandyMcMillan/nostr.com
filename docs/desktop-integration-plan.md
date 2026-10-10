@@ -59,7 +59,8 @@ The following operations have been wired behind the `window.nostrGit` bridge and
 - Migrate parsing logic (status, diff, log, refs) to desktop's parsers for consistency and better error messages.
   - ✅ Migrated `electron/git/status.cjs` to desktop-style `--porcelain=2 -z` parsing with branch headers, ahead/behind, current tip, and upstream branch.
   - ✅ Added `electron/git/status.test.mjs` covering untracked, staged, modified, renamed, and mocked buffer parsing.
-  - ⬜ Migrate diff parser.
+  - ✅ Migrated `electron/git/diff.cjs` to desktop-style `--patch-with-raw -z` output and added `hideWhitespace` option support.
+  - ✅ Added `electron/git/diff.test.mjs` covering modified, staged, raw-header stripping, stage, and unstage.
   - ⬜ Migrate log parser.
   - ⬜ Migrate refs parser.
 - Keep the IPC payload contracts stable so `src/lib/nativeGit.ts` needs only additive changes.
